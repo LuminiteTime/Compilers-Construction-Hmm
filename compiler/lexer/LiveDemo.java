@@ -8,8 +8,8 @@ import java.util.*;
 public class LiveDemo {
     private static final String BANNER = 
         "╔══════════════════════════════════════════════════════════════════╗\n" +
-        "║                    Team Hmm - Lexer Live Demo                   ║\n" +
-        "║                   Imperative (I) Language                       ║\n" +
+        "║                    Team Hmm - Lexer Live Demo                    ║\n" +
+        "║                   Imperative (I) Language                        ║\n" +
         "╚══════════════════════════════════════════════════════════════════╝";
     
     private static final String[] QUICK_EXAMPLES = {
@@ -36,28 +36,28 @@ public class LiveDemo {
                 case "3" -> runFileInput(scanner);
                 case "4" -> showTokenTypes();
                 case "5" -> {
-                    System.out.println("🎉 Thanks for using Team Hmm Lexer Demo!");
+                    System.out.println("Thanks for using Team Hmm Lexer Demo!");
                     return;
                 }
-                default -> System.out.println("❌ Invalid choice. Please try again.\n");
+                default -> System.out.println("Invalid choice. Please try again.\n");
             }
         }
     }
     
     private static void showMenu() {
         System.out.println("═══════════════════════════════════════");
-        System.out.println("🚀 LEXER DEMO OPTIONS:");
+        System.out.println("LEXER DEMO OPTIONS:");
         System.out.println("═══════════════════════════════════════");
-        System.out.println("1. 💬 Enter custom source code");
-        System.out.println("2. ⚡ Quick examples");
-        System.out.println("3. 📁 Load from file");
-        System.out.println("4. 🏷️  Show all token types");
-        System.out.println("5. 🚪 Exit");
+        System.out.println("1. Enter custom source code");
+        System.out.println("2. Quick examples");
+        System.out.println("3. Load from file");
+        System.out.println("4. Show all token types");
+        System.out.println("5. Exit");
         System.out.println("═══════════════════════════════════════");
     }
     
     private static void runCustomInput(Scanner scanner) {
-        System.out.println("\n📝 CUSTOM INPUT MODE");
+        System.out.println("\nCUSTOM INPUT MODE");
         System.out.println("Enter your Imperative (I) source code (type 'END' on a new line to finish):");
         System.out.println("───────────────────────────────────────");
         
@@ -69,7 +69,7 @@ public class LiveDemo {
         }
         
         if (sourceCode.length() == 0) {
-            System.out.println("❌ No input provided.\n");
+            System.out.println("No input provided.\n");
             return;
         }
         
@@ -80,7 +80,7 @@ public class LiveDemo {
     }
     
     private static void showQuickExamples(Scanner scanner) {
-        System.out.println("\n⚡ QUICK EXAMPLES");
+        System.out.println("\nQUICK EXAMPLES");
         System.out.println("Choose an example to analyze:");
         System.out.println("───────────────────────────────────────");
         
@@ -95,7 +95,7 @@ public class LiveDemo {
             int choice = Integer.parseInt(scanner.nextLine().trim());
             if (choice == 0) return;
             if (choice < 1 || choice > QUICK_EXAMPLES.length) {
-                System.out.println("❌ Invalid example number.\n");
+                System.out.println("Invalid example number.\n");
                 return;
             }
             
@@ -103,12 +103,12 @@ public class LiveDemo {
             analyzeInput("Example " + choice, example);
             
         } catch (NumberFormatException e) {
-            System.out.println("❌ Please enter a valid number.\n");
+            System.out.println("Please enter a valid number.\n");
         }
     }
     
     private static void runFileInput(Scanner scanner) {
-        System.out.println("\n📁 FILE INPUT MODE");
+        System.out.println("\nFILE INPUT MODE");
         System.out.print("Enter file path (relative to current directory): ");
         String filePath = scanner.nextLine().trim();
         
@@ -122,22 +122,22 @@ public class LiveDemo {
             }
             
             if (content.length() == 0) {
-                System.out.println("❌ File is empty or could not be read.\n");
+                System.out.println("File is empty or could not be read.\n");
                 return;
             }
             
             analyzeInput("File: " + filePath, content.toString().trim());
             
         } catch (IOException e) {
-            System.out.println("❌ Error reading file: " + e.getMessage() + "\n");
+            System.out.println("Error reading file: " + e.getMessage() + "\n");
         }
     }
     
     private static void analyzeInput(String inputName, String sourceCode) {
-        System.out.println("\n🔍 LEXICAL ANALYSIS RESULTS");
+        System.out.println("\nLEXICAL ANALYSIS RESULTS");
         System.out.printf("Input: %s\n", inputName);
         System.out.println("═══════════════════════════════════════");
-        System.out.println("📄 SOURCE CODE:");
+        System.out.println("SOURCE CODE:");
         System.out.println("───────────────────────────────────────");
         
         // Show source with line numbers
@@ -147,7 +147,7 @@ public class LiveDemo {
         }
         
         System.out.println("───────────────────────────────────────");
-        System.out.println("🏷️  RECOGNIZED TOKENS:");
+        System.out.println("RECOGNIZED TOKENS:");
         System.out.println("───────────────────────────────────────");
         
         try {
@@ -165,71 +165,71 @@ public class LiveDemo {
             // Display tokens in a formatted way
             for (Token t : tokens) {
                 String typeColor = getTokenTypeColor(t.getType());
-                System.out.printf("[%2d] %s%-15s%s : %-20s @ %d:%d\n", 
-                    index++, typeColor, t.getType(), "🔸", 
+                System.out.printf("[%2d] %s%-15s%s : %-20s @ %d:%d\n",
+                    index++, typeColor, t.getType(), ":",
                     "\"" + t.getLexeme() + "\"", t.getLine(), t.getColumn());
             }
             
             System.out.println("───────────────────────────────────────");
-            System.out.printf("✅ SUCCESS: %d tokens recognized\n\n", tokens.size());
+            System.out.printf("SUCCESS: %d tokens recognized\n\n", tokens.size());
             
         } catch (LexerException e) {
-            System.out.println("❌ LEXICAL ERROR:");
+            System.out.println("LEXICAL ERROR:");
             System.out.printf("   %s\n", e.getMessage());
             System.out.printf("   Location: Line %d, Column %d\n", e.getLine(), e.getColumn());
             System.out.println("───────────────────────────────────────");
-            System.out.println("💡 This demonstrates error handling with precise location!\n");
+            System.out.println("This demonstrates error handling with precise location!\n");
         }
     }
     
     private static String getTokenTypeColor(TokenType type) {
         // Simple visual grouping for presentation
         return switch (type.toString()) {
-            case "VAR", "TYPE", "IS", "ROUTINE", "END", "IF", "THEN", "ELSE", 
-                 "WHILE", "LOOP", "FOR", "IN", "REVERSE", "RETURN", "PRINT" -> "🔵"; // Keywords
-            case "INTEGER", "REAL", "BOOLEAN", "ARRAY", "RECORD" -> "🟢"; // Types
-            case "IDENTIFIER" -> "🟡"; // Identifiers
-            case "INTEGER_LITERAL", "REAL_LITERAL", "STRING_LITERAL", "TRUE", "FALSE" -> "🟠"; // Literals
+            case "VAR", "TYPE", "IS", "ROUTINE", "END", "IF", "THEN", "ELSE",
+                 "WHILE", "LOOP", "FOR", "IN", "REVERSE", "RETURN", "PRINT" -> "K"; // Keywords
+            case "INTEGER", "REAL", "BOOLEAN", "ARRAY", "RECORD" -> "T"; // Types
+            case "IDENTIFIER" -> "I"; // Identifiers
+            case "INTEGER_LITERAL", "REAL_LITERAL", "STRING_LITERAL", "TRUE", "FALSE" -> "L"; // Literals
             case "PLUS", "MINUS", "MULTIPLY", "DIVIDE", "MODULO", "EQUAL", "NOT_EQUAL",
-                 "LESS", "GREATER", "LESS_EQUAL", "GREATER_EQUAL", "AND", "OR", "XOR", "NOT" -> "🔴"; // Operators
-            case "ASSIGN", "COLON", "SEMICOLON", "COMMA", "DOT", "RANGE" -> "🟣"; // Punctuation
-            case "LPAREN", "RPAREN", "LBRACKET", "RBRACKET" -> "⚪"; // Brackets
-            default -> "⚫"; // Others/EOF
+                 "LESS", "GREATER", "LESS_EQUAL", "GREATER_EQUAL", "AND", "OR", "XOR", "NOT" -> "O"; // Operators
+            case "ASSIGN", "COLON", "SEMICOLON", "COMMA", "DOT", "RANGE" -> "P"; // Punctuation
+            case "LPAREN", "RPAREN", "LBRACKET", "RBRACKET" -> "B"; // Brackets
+            default -> "S"; // Others/EOF
         };
     }
     
     private static void showTokenTypes() {
-        System.out.println("\n🏷️  ALL TOKEN TYPES (43 total)");
+        System.out.println("\nALL TOKEN TYPES (43 total)");
         System.out.println("═══════════════════════════════════════");
         
-        System.out.println("🔵 KEYWORDS:");
+        System.out.println("KEYWORDS:");
         System.out.println("   VAR, TYPE, IS, ROUTINE, END, IF, THEN, ELSE");
         System.out.println("   WHILE, LOOP, FOR, IN, REVERSE, RETURN, PRINT");
-        
-        System.out.println("\n🟢 TYPE KEYWORDS:");
+
+        System.out.println("\nTYPE KEYWORDS:");
         System.out.println("   INTEGER, REAL, BOOLEAN, ARRAY, RECORD");
-        
-        System.out.println("\n🟡 IDENTIFIERS:");
+
+        System.out.println("\nIDENTIFIERS:");
         System.out.println("   IDENTIFIER (user-defined names)");
-        
-        System.out.println("\n🟠 LITERALS:");
+
+        System.out.println("\nLITERALS:");
         System.out.println("   INTEGER_LITERAL, REAL_LITERAL, STRING_LITERAL");
         System.out.println("   TRUE, FALSE");
-        
-        System.out.println("\n🔴 OPERATORS:");
+
+        System.out.println("\nOPERATORS:");
         System.out.println("   PLUS(+), MINUS(-), MULTIPLY(*), DIVIDE(/), MODULO(%)");
         System.out.println("   EQUAL(=), NOT_EQUAL(/=), LESS(<), GREATER(>)");
         System.out.println("   LESS_EQUAL(<=), GREATER_EQUAL(>=)");
         System.out.println("   AND, OR, XOR, NOT");
-        
-        System.out.println("\n🟣 PUNCTUATION:");
+
+        System.out.println("\nPUNCTUATION:");
         System.out.println("   ASSIGN(:=), COLON(:), SEMICOLON(;), COMMA(,)");
         System.out.println("   DOT(.), RANGE(..)");
-        
-        System.out.println("\n⚪ BRACKETS:");
+
+        System.out.println("\nBRACKETS:");
         System.out.println("   LPAREN((), RPAREN()), LBRACKET([), RBRACKET(])");
-        
-        System.out.println("\n⚫ SPECIAL:");
+
+        System.out.println("\nSPECIAL:");
         System.out.println("   EOF (End of File)");
         
         System.out.println("═══════════════════════════════════════\n");
