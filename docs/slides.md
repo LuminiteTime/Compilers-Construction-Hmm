@@ -191,6 +191,33 @@ end
 
 **✓ Expected:** Nested data structures and iteration
 
+---
+
+### Test 11: Nested Records
+
+**Code Example:**
+```java
+type Address is record
+    var street: string;
+    var city: string;
+    var zip: integer;
+end
+
+type Person is record
+    var name: string;
+    var age: integer;
+    var address: Address;
+end
+
+var person: Person;
+person.name := "John Doe";
+person.age := 30;
+person.address.street := "123 Main St";
+person.address.city := "New York";
+person.address.zip := 10001;
+```
+
+**✓ Expected:** Nested record types and multi-level dot notation access
 
 ---
 
