@@ -60,13 +60,10 @@ public class Lexer {
                     return new Token(TokenType.EOF, "", line, column);
                 }
 
-                case ' ', '\t', '\r' -> {
+                case ' ', '\t', '\r', '\n' -> {
                     advance();
                 }
 
-                case '\n' -> {
-                    advance();
-                }
                 case ';' -> {
                     advance();
                     return new Token(TokenType.SEMICOLON, ";", startLine, startColumn);

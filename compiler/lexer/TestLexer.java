@@ -24,9 +24,9 @@ public class TestLexer {
         System.out.println("Results: " + passedTests + "/" + totalTests + " tests passed");
 
         if (passedTests == totalTests) {
-            System.out.println("🎉 All tests passed!");
+            System.out.println("All tests passed!");
         } else {
-            System.out.println("❌ " + (totalTests - passedTests) + " tests failed");
+            System.out.println((totalTests - passedTests) + " tests failed");
         }
     }
 
@@ -44,10 +44,10 @@ public class TestLexer {
             actualTokens.add(token);
 
             if (compareTokenLists(actualTokens, expectedTokens)) {
-                System.out.println("✓ Test passed - All tokens match expected output\n");
+                System.out.println("Test passed - All tokens match expected output\n");
                 return 1;
             } else {
-                System.out.println("✗ Test failed - Token mismatch:");
+                System.out.println("Test failed - Token mismatch:");
                 showTokenDifferences(actualTokens, expectedTokens);
                 System.out.println();
                 return 0;
