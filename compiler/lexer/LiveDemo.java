@@ -10,7 +10,7 @@ public class LiveDemo {
         "// Comment demo\nvar y: real;"
     };
 
-1    public static void main(String[] args) {
+    public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
         while (true) {
