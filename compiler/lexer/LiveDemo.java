@@ -10,18 +10,23 @@ public class LiveDemo {
         "// Comment demo\nvar y: real;"
     };
 
+
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
+
 
         while (true) {
             showMenu();
             System.out.print("Your choice: ");
             String choice = scanner.nextLine().trim();
 
+
             switch (choice) {
                 case "1" -> runCustomInput(scanner);
                 case "2" -> showQuickExamples(scanner);
                 case "3" -> runFileInput(scanner);
+                case "4" -> {
+                    System.out.println("Goodbye!");
                 case "4" -> {
                     System.out.println("Goodbye!");
                     return;
@@ -33,11 +38,15 @@ public class LiveDemo {
     
     private static void showMenu() {
         System.out.println("=======================================");
+        System.out.println("=======================================");
         System.out.println("LEXER DEMO OPTIONS:");
+        System.out.println("=======================================");
         System.out.println("=======================================");
         System.out.println("1. Enter custom source code");
         System.out.println("2. Quick examples");
         System.out.println("3. Load from file");
+        System.out.println("4. Exit");
+        System.out.println("=======================================");
         System.out.println("4. Exit");
         System.out.println("=======================================");
     }
@@ -120,6 +129,7 @@ public class LiveDemo {
     
     private static void analyzeInput(String inputName, String sourceCode) {
         System.out.println("\n=== LEXICAL ANALYSIS ===");
+        System.out.println("\n=== LEXICAL ANALYSIS ===");
         System.out.printf("Input: %s\n", inputName);
         System.out.println("Source code:");
         System.out.println("-------------------");
@@ -127,7 +137,12 @@ public class LiveDemo {
         String[] lines = sourceCode.split("\n");
         for (int i = 0; i < lines.length; i++) {
             System.out.printf("%2d: %s\n", i + 1, lines[i]);
+            System.out.printf("%2d: %s\n", i + 1, lines[i]);
         }
+
+        System.out.println("\nTokens:");
+        System.out.println("-------------------");
+
 
         System.out.println("\nTokens:");
         System.out.println("-------------------");
@@ -150,7 +165,14 @@ public class LiveDemo {
             System.out.println("-------------------");
             System.out.printf("Total: %d tokens\n\n", tokens.size());
 
+
+            System.out.println("-------------------");
+            System.out.printf("Total: %d tokens\n\n", tokens.size());
+
         } catch (LexerException e) {
+            System.out.println("ERROR:");
+            System.out.printf("  %s\n", e.getMessage());
+            System.out.printf("  Location: Line %d, Column %d\n\n", e.getLine(), e.getColumn());
             System.out.println("ERROR:");
             System.out.printf("  %s\n", e.getMessage());
             System.out.printf("  Location: Line %d, Column %d\n\n", e.getLine(), e.getColumn());
