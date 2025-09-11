@@ -2,16 +2,9 @@ import java.io.*;
 import java.util.*;
 
 /**
- * Interactive live demo for the Imperative (I) language lexer.
- * Perfect for presentations and demonstrations.
+ * Simple live demo for the Imperative (I) language lexer.
  */
 public class LiveDemo {
-    private static final String BANNER = 
-        "╔══════════════════════════════════════════════════════════════════╗\n" +
-        "║                    Team Hmm - Lexer Live Demo                    ║\n" +
-        "║                   Imperative (I) Language                        ║\n" +
-        "╚══════════════════════════════════════════════════════════════════╝";
-    
     private static final String[] QUICK_EXAMPLES = {
         "var x: integer is 42;",
         "for i in 1..10 loop print i; end",
@@ -19,24 +12,21 @@ public class LiveDemo {
         "var x @ 42;  // Error demo",
         "// Comment demo\nvar y: real;"
     };
-    
+
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        System.out.println(BANNER);
-        System.out.println();
-        
+
         while (true) {
             showMenu();
             System.out.print("Your choice: ");
             String choice = scanner.nextLine().trim();
-            
+
             switch (choice) {
                 case "1" -> runCustomInput(scanner);
                 case "2" -> showQuickExamples(scanner);
                 case "3" -> runFileInput(scanner);
-                case "4" -> showTokenTypes();
-                case "5" -> {
-                    System.out.println("Thanks for using Team Hmm Lexer Demo!");
+                case "4" -> {
+                    System.out.println("Goodbye!");
                     return;
                 }
                 default -> System.out.println("Invalid choice. Please try again.\n");
@@ -45,15 +35,14 @@ public class LiveDemo {
     }
     
     private static void showMenu() {
-        System.out.println("═══════════════════════════════════════");
+        System.out.println("=======================================");
         System.out.println("LEXER DEMO OPTIONS:");
-        System.out.println("═══════════════════════════════════════");
+        System.out.println("=======================================");
         System.out.println("1. Enter custom source code");
         System.out.println("2. Quick examples");
         System.out.println("3. Load from file");
-        System.out.println("4. Show all token types");
-        System.out.println("5. Exit");
-        System.out.println("═══════════════════════════════════════");
+        System.out.println("4. Exit");
+        System.out.println("=======================================");
     }
     
     private static void runCustomInput(Scanner scanner) {
@@ -134,104 +123,46 @@ public class LiveDemo {
     }
     
     private static void analyzeInput(String inputName, String sourceCode) {
-        System.out.println("\nLEXICAL ANALYSIS RESULTS");
+        System.out.println("\n=== LEXICAL ANALYSIS ===");
         System.out.printf("Input: %s\n", inputName);
-        System.out.println("═══════════════════════════════════════");
-        System.out.println("SOURCE CODE:");
-        System.out.println("───────────────────────────────────────");
-        
+        System.out.println("Source code:");
+        System.out.println("-------------------");
+
         // Show source with line numbers
         String[] lines = sourceCode.split("\n");
         for (int i = 0; i < lines.length; i++) {
-            System.out.printf("%2d│ %s\n", i + 1, lines[i]);
+            System.out.printf("%2d: %s\n", i + 1, lines[i]);
         }
-        
-        System.out.println("───────────────────────────────────────");
-        System.out.println("RECOGNIZED TOKENS:");
-        System.out.println("───────────────────────────────────────");
-        
+
+        System.out.println("\nTokens:");
+        System.out.println("-------------------");
+
         try {
             Lexer lexer = new Lexer(new StringReader(sourceCode));
             List<Token> tokens = new ArrayList<>();
             Token token;
-            int index = 0;
-            
+
             // Collect all tokens
             while ((token = lexer.nextToken()).getType() != TokenType.EOF) {
                 tokens.add(token);
             }
             tokens.add(token); // Add EOF token
-            
-            // Display tokens in a formatted way
-            for (Token t : tokens) {
-                String typeColor = getTokenTypeColor(t.getType());
-                System.out.printf("[%2d] %s%-15s%s : %-20s @ %d:%d\n",
-                    index++, typeColor, t.getType(), ":",
-                    "\"" + t.getLexeme() + "\"", t.getLine(), t.getColumn());
+
+            // Display tokens
+            for (int i = 0; i < tokens.size(); i++) {
+                Token t = tokens.get(i);
+                System.out.printf("[%d] %-15s : \"%s\" @ %d:%d\n",
+                    i, t.getType(), t.getLexeme(), t.getLine(), t.getColumn());
             }
-            
-            System.out.println("───────────────────────────────────────");
-            System.out.printf("SUCCESS: %d tokens recognized\n\n", tokens.size());
-            
+
+            System.out.println("-------------------");
+            System.out.printf("Total: %d tokens\n\n", tokens.size());
+
         } catch (LexerException e) {
-            System.out.println("LEXICAL ERROR:");
-            System.out.printf("   %s\n", e.getMessage());
-            System.out.printf("   Location: Line %d, Column %d\n", e.getLine(), e.getColumn());
-            System.out.println("───────────────────────────────────────");
-            System.out.println("This demonstrates error handling with precise location!\n");
+            System.out.println("ERROR:");
+            System.out.printf("  %s\n", e.getMessage());
+            System.out.printf("  Location: Line %d, Column %d\n\n", e.getLine(), e.getColumn());
         }
     }
     
-    private static String getTokenTypeColor(TokenType type) {
-        // Simple visual grouping for presentation
-        return switch (type.toString()) {
-            case "VAR", "TYPE", "IS", "ROUTINE", "END", "IF", "THEN", "ELSE",
-                 "WHILE", "LOOP", "FOR", "IN", "REVERSE", "RETURN", "PRINT" -> "K"; // Keywords
-            case "INTEGER", "REAL", "BOOLEAN", "ARRAY", "RECORD" -> "T"; // Types
-            case "IDENTIFIER" -> "I"; // Identifiers
-            case "INTEGER_LITERAL", "REAL_LITERAL", "STRING_LITERAL", "TRUE", "FALSE" -> "L"; // Literals
-            case "PLUS", "MINUS", "MULTIPLY", "DIVIDE", "MODULO", "EQUAL", "NOT_EQUAL",
-                 "LESS", "GREATER", "LESS_EQUAL", "GREATER_EQUAL", "AND", "OR", "XOR", "NOT" -> "O"; // Operators
-            case "ASSIGN", "COLON", "SEMICOLON", "COMMA", "DOT", "RANGE" -> "P"; // Punctuation
-            case "LPAREN", "RPAREN", "LBRACKET", "RBRACKET" -> "B"; // Brackets
-            default -> "S"; // Others/EOF
-        };
-    }
-    
-    private static void showTokenTypes() {
-        System.out.println("\nALL TOKEN TYPES (43 total)");
-        System.out.println("═══════════════════════════════════════");
-        
-        System.out.println("KEYWORDS:");
-        System.out.println("   VAR, TYPE, IS, ROUTINE, END, IF, THEN, ELSE");
-        System.out.println("   WHILE, LOOP, FOR, IN, REVERSE, RETURN, PRINT");
-
-        System.out.println("\nTYPE KEYWORDS:");
-        System.out.println("   INTEGER, REAL, BOOLEAN, ARRAY, RECORD");
-
-        System.out.println("\nIDENTIFIERS:");
-        System.out.println("   IDENTIFIER (user-defined names)");
-
-        System.out.println("\nLITERALS:");
-        System.out.println("   INTEGER_LITERAL, REAL_LITERAL, STRING_LITERAL");
-        System.out.println("   TRUE, FALSE");
-
-        System.out.println("\nOPERATORS:");
-        System.out.println("   PLUS(+), MINUS(-), MULTIPLY(*), DIVIDE(/), MODULO(%)");
-        System.out.println("   EQUAL(=), NOT_EQUAL(/=), LESS(<), GREATER(>)");
-        System.out.println("   LESS_EQUAL(<=), GREATER_EQUAL(>=)");
-        System.out.println("   AND, OR, XOR, NOT");
-
-        System.out.println("\nPUNCTUATION:");
-        System.out.println("   ASSIGN(:=), COLON(:), SEMICOLON(;), COMMA(,)");
-        System.out.println("   DOT(.), RANGE(..)");
-
-        System.out.println("\nBRACKETS:");
-        System.out.println("   LPAREN((), RPAREN()), LBRACKET([), RBRACKET(])");
-
-        System.out.println("\nSPECIAL:");
-        System.out.println("   EOF (End of File)");
-        
-        System.out.println("═══════════════════════════════════════\n");
-    }
 }
