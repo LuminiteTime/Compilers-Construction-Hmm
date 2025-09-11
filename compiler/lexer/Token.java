@@ -1,7 +1,3 @@
-/**
- * Represents a lexical token in the Imperative (I) language.
- * Contains the token type, lexeme (raw text), and position information.
- */
 public class Token {
     private final TokenType type;
     private final String lexeme;
@@ -10,16 +6,6 @@ public class Token {
     private final int endLine;
     private final int endColumn;
 
-    /**
-     * Constructs a token with position information.
-     *
-     * @param type The token type
-     * @param lexeme The raw lexeme string
-     * @param line Starting line number (1-based)
-     * @param column Starting column number (1-based)
-     * @param endLine Ending line number (1-based)
-     * @param endColumn Ending column number (1-based)
-     */
     public Token(TokenType type, String lexeme, int line, int column, int endLine, int endColumn) {
         this.type = type;
         this.lexeme = lexeme;
@@ -29,14 +15,6 @@ public class Token {
         this.endColumn = endColumn;
     }
 
-    /**
-     * Constructs a token with single-character position (start == end).
-     *
-     * @param type The token type
-     * @param lexeme The raw lexeme string
-     * @param line Line number (1-based)
-     * @param column Column number (1-based)
-     */
     public Token(TokenType type, String lexeme, int line, int column) {
         this(type, lexeme, line, column, line, column);
     }
@@ -65,12 +43,10 @@ public class Token {
         return endColumn;
     }
 
-    @Override
     public String toString() {
         return String.format("%s:%s@%d:%d", type, lexeme, line, column);
     }
 
-    @Override
     public boolean equals(Object obj) {
         if (this == obj) return true;
         if (!(obj instanceof Token)) return false;
@@ -81,7 +57,6 @@ public class Token {
                column == other.column;
     }
 
-    @Override
     public int hashCode() {
         return java.util.Objects.hash(type, lexeme, line, column);
     }

@@ -1,10 +1,6 @@
 import java.io.*;
 import java.util.*;
 
-/**
- * Test suite for the Imperative (I) language lexer.
- * Validates lexer functionality by comparing actual token output with expected results.
- */
 public class TestLexer {
 
     public static void main(String[] args) {
@@ -12,8 +8,6 @@ public class TestLexer {
 
         int passedTests = 0;
         int totalTests = 11;
-
-        // Run all test cases
         passedTests += runTest("Variable Declarations", TEST_1_VARIABLE_DECLARATIONS, EXPECTED_1_VARIABLE_DECLARATIONS);
         passedTests += runTest("Arrays & Data Structures", TEST_2_ARRAYS_DATA_STRUCTURES, EXPECTED_2_ARRAYS_DATA_STRUCTURES);
         passedTests += runTest("Record Types", TEST_3_RECORD_TYPES, EXPECTED_3_RECORD_TYPES);
@@ -47,9 +41,8 @@ public class TestLexer {
             while ((token = lexer.nextToken()).getType() != TokenType.EOF) {
                 actualTokens.add(token);
             }
-            actualTokens.add(token); // Add EOF token
+            actualTokens.add(token);
 
-            // Compare actual vs expected
             if (compareTokenLists(actualTokens, expectedTokens)) {
                 System.out.println("✓ Test passed - All tokens match expected output\n");
                 return 1;
@@ -106,7 +99,6 @@ public class TestLexer {
         }
     }
 
-    // Test case constants
     private static final String TEST_1_VARIABLE_DECLARATIONS = """
         var x: integer is 42;
         var y: real is 3.14;
@@ -196,7 +188,6 @@ public class TestLexer {
         "person.address.city := \"New York\";\n" +
         "person.address.zip := 10001;";
 
-    // Expected token lists for each test case
     private static final List<Token> EXPECTED_1_VARIABLE_DECLARATIONS = Arrays.asList(
         new Token(TokenType.VAR, "var", 1, 1),
         new Token(TokenType.IDENTIFIER, "x", 1, 5),

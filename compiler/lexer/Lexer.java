@@ -2,11 +2,6 @@ import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Lexer for the Imperative (I) language.
- * Implements a finite state machine for lexical analysis with maximal munch principle.
- * Supports Unicode characters, accurate position tracking, and comprehensive error handling.
- */
 public class Lexer {
     private final Reader reader;
     private int currentChar;
@@ -14,11 +9,9 @@ public class Lexer {
     private int column = 1;
     private boolean eofReached = false;
 
-    // Keyword lookup table for O(1) recognition
     private static final Map<String, TokenType> KEYWORDS = new HashMap<>();
 
     static {
-        // Declaration keywords
         KEYWORDS.put("var", TokenType.VAR);
         KEYWORDS.put("type", TokenType.TYPE);
         KEYWORDS.put("is", TokenType.IS);
@@ -28,8 +21,6 @@ public class Lexer {
         KEYWORDS.put("array", TokenType.ARRAY);
         KEYWORDS.put("record", TokenType.RECORD);
         KEYWORDS.put("end", TokenType.END);
-
-        // Statement keywords
         KEYWORDS.put("while", TokenType.WHILE);
         KEYWORDS.put("loop", TokenType.LOOP);
         KEYWORDS.put("for", TokenType.FOR);
@@ -40,25 +31,15 @@ public class Lexer {
         KEYWORDS.put("else", TokenType.ELSE);
         KEYWORDS.put("print", TokenType.PRINT);
         KEYWORDS.put("routine", TokenType.ROUTINE);
-
-        // Expression/Boolean keywords
         KEYWORDS.put("true", TokenType.TRUE);
         KEYWORDS.put("false", TokenType.FALSE);
         KEYWORDS.put("and", TokenType.AND);
         KEYWORDS.put("or", TokenType.OR);
         KEYWORDS.put("xor", TokenType.XOR);
         KEYWORDS.put("not", TokenType.NOT);
-
-        // Other keywords
         KEYWORDS.put("return", TokenType.RETURN);
     }
 
-    /**
-     * Constructs a lexer with the given input source.
-     *
-     * @param reader The input source reader (typically BufferedReader)
-     * @throws LexerException if the reader cannot be read
-     */
     public Lexer(Reader reader) throws LexerException {
         this.reader = reader;
         try {
@@ -68,33 +49,24 @@ public class Lexer {
         }
     }
 
-    /**
-     * Returns the next token from the input stream.
-     * Uses finite state machine approach with maximal munch principle.
-     *
-     * @return The next token, or EOF token if end of input is reached
-     * @throws LexerException if a lexical error is encountered
-     */
     public Token nextToken() throws LexerException {
         while (!eofReached) {
             int startLine = line;
             int startColumn = column;
 
             switch (currentChar) {
-                case -1 -> { // EOF
+                case -1 -> {
                     eofReached = true;
                     return new Token(TokenType.EOF, "", line, column);
                 }
 
-                case ' ', '\t', '\r' -> { // Skip whitespace
+                case ' ', '\t', '\r' -> {
                     advance();
                 }
 
-                case '\n' -> { // Handle newlines
+                case '\n' -> {
                     advance();
                 }
-
-                // Single-character tokens
                 case ';' -> {
                     advance();
                     return new Token(TokenType.SEMICOLON, ";", startLine, startColumn);
@@ -132,7 +104,6 @@ public class Lexer {
                     return new Token(TokenType.MODULO, "%", startLine, startColumn);
                 }
 
-                // Potential multi-character tokens
                 case '-' -> {
                     return scanMinusOrComment(startLine, startColumn);
                 }
@@ -175,40 +146,32 @@ public class Lexer {
         return new Token(TokenType.EOF, "", line, column);
     }
 
-    /**
-     * Scans a minus token or single-line comment.
-     */
     private Token scanMinusOrComment(int startLine, int startColumn) throws LexerException {
-        advance(); // consume '-'
+        advance();
         return new Token(TokenType.MINUS, "-", startLine, startColumn);
     }
 
-    /**
-     * Scans divide operator or comments (single-line // and multi-line / * ... * /).
-     */
     private Token scanDivideOrComment(int startLine, int startColumn) throws LexerException {
-        advance(); // consume '/'
+        advance();
 
         switch (currentChar) {
             case '/':
-                // Single-line comment: // ... end of line
-                advance(); // consume second '/'
+                advance();
                 while (currentChar != '\n' && currentChar != -1) {
                     advance();
                 }
-                return nextToken(); // Skip comment, return next token
+                return nextToken();
 
             case '*':
-                // Multi-line comment: /* ... */
-                advance(); // consume '*'
+                advance();
                 while (true) {
                     switch (currentChar) {
                         case -1 -> throw new LexerException("Unterminated multi-line comment", startLine, startColumn);
                         case '*' -> {
-                            advance(); // consume '*'
+                            advance();
                             if (currentChar == '/') {
-                                advance(); // consume '/'
-                                return nextToken(); // Skip comment, return next token
+                                advance();
+                                return nextToken();
                             }
                         }
                         default -> advance();
@@ -216,7 +179,7 @@ public class Lexer {
                 }
 
             case '=':
-                advance(); // consume '='
+                advance();
                 return new Token(TokenType.NOT_EQUAL, "/=", startLine, startColumn, line, column);
 
             default:
@@ -224,82 +187,64 @@ public class Lexer {
         }
     }
 
-    /**
-     * Scans less-than or less-than-or-equal operator.
-     */
     private Token scanLessOrLessEqual(int startLine, int startColumn) throws LexerException {
-        advance(); // consume '<'
+        advance();
         if (currentChar == '=') {
-            advance(); // consume '='
+            advance();
             return new Token(TokenType.LESS_EQUAL, "<=", startLine, startColumn, line, column);
         } else {
             return new Token(TokenType.LESS, "<", startLine, startColumn);
         }
     }
 
-    /**
-     * Scans greater-than or greater-than-or-equal operator.
-     */
     private Token scanGreaterOrGreaterEqual(int startLine, int startColumn) throws LexerException {
-        advance(); // consume '>'
+        advance();
         if (currentChar == '=') {
-            advance(); // consume '='
+            advance();
             return new Token(TokenType.GREATER_EQUAL, ">=", startLine, startColumn, line, column);
         } else {
             return new Token(TokenType.GREATER, ">", startLine, startColumn);
         }
     }
 
-    /**
-     * Scans equal operator or not-equal operator.
-     */
     private Token scanEqualOrNotEqual(int startLine, int startColumn) throws LexerException {
-        advance(); // consume '='
+        advance();
         return new Token(TokenType.EQUAL, "=", startLine, startColumn);
     }
 
-    /**
-     * Scans colon or assignment operator (:=).
-     */
     private Token scanColonOrAssign(int startLine, int startColumn) throws LexerException {
-        advance(); // consume ':'
+        advance();
         if (currentChar == '=') {
-            advance(); // consume '='
+            advance();
             return new Token(TokenType.ASSIGN, ":=", startLine, startColumn, line, column);
         } else {
             return new Token(TokenType.COLON, ":", startLine, startColumn);
         }
     }
 
-    /**
-     * Scans dot or range operator (..).
-     */
     private Token scanDotOrRange(int startLine, int startColumn) throws LexerException {
-        advance(); // consume '.'
+        advance();
         if (currentChar == '.') {
-            advance(); // consume second '.'
+            advance();
             return new Token(TokenType.RANGE, "..", startLine, startColumn, line, column);
         } else {
             return new Token(TokenType.DOT, ".", startLine, startColumn);
         }
     }
 
-    /**
-     * Scans string literal with escape sequences.
-     */
     private Token scanStringLiteral(int startLine, int startColumn) throws LexerException {
         StringBuilder lexeme = new StringBuilder();
         lexeme.append('"');
-        advance(); // consume opening quote
+        advance();
 
         while (currentChar != '"' && currentChar != -1) {
             switch (currentChar) {
                 case '\\' -> {
                     lexeme.append((char) currentChar);
-                    advance(); // consume backslash
+                    advance();
                     if (currentChar != -1) {
                         lexeme.append((char) currentChar);
-                        advance(); // consume escaped character
+                        advance();
                     }
                 }
 
@@ -317,18 +262,14 @@ public class Lexer {
         }
 
         lexeme.append('"');
-        advance(); // consume closing quote
+        advance();
 
         return new Token(TokenType.STRING_LITERAL, lexeme.toString(), startLine, startColumn, line, column);
     }
 
-    /**
-     * Scans identifier or keyword using maximal munch.
-     */
     private Token scanIdentifierOrKeyword(int startLine, int startColumn) throws LexerException {
         StringBuilder lexeme = new StringBuilder();
 
-        // First character must be letter or underscore
         if (!Character.isLetter(currentChar) && currentChar != '_') {
             throw new LexerException("Invalid identifier start character", line, column);
         }
@@ -340,7 +281,6 @@ public class Lexer {
 
         String identifier = lexeme.toString();
 
-        // Check if it's a keyword
         TokenType type = KEYWORDS.get(identifier);
         if (type != null) {
             return new Token(type, identifier, startLine, startColumn, line, column);
@@ -349,34 +289,27 @@ public class Lexer {
         }
     }
 
-    /**
-     * Scans integer or real number literal.
-     */
     private Token scanNumberLiteral(int startLine, int startColumn) throws LexerException {
         StringBuilder lexeme = new StringBuilder();
         boolean hasDecimalPoint = false;
         boolean hasDigits = false;
 
-        // Optional sign
         if (currentChar == '+' || currentChar == '-') {
             lexeme.append((char) currentChar);
             advance();
         }
 
-        // Integer part
         while (Character.isDigit(currentChar)) {
             lexeme.append((char) currentChar);
             hasDigits = true;
             advance();
         }
 
-        // Optional decimal part
         if (currentChar == '.') {
             hasDecimalPoint = true;
             lexeme.append((char) currentChar);
             advance();
 
-            // Digits after decimal point
             while (Character.isDigit(currentChar)) {
                 lexeme.append((char) currentChar);
                 hasDigits = true;
@@ -394,9 +327,6 @@ public class Lexer {
         return new Token(type, numberStr, startLine, startColumn, line, column);
     }
 
-    /**
-     * Advances to the next character, updating line and column counters.
-     */
     private void advance() throws LexerException {
         try {
             if (currentChar == '\n') {
