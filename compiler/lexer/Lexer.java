@@ -1,9 +1,12 @@
-import java.io.*;
+import java.io.IOException;
+import java.io.PushbackReader;
+import java.io.Reader;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public class Lexer {
-    private final Reader reader;
+    private final PushbackReader reader;
     private int currentChar;
     private int line = 1;
     private int column = 1;
@@ -41,9 +44,9 @@ public class Lexer {
     }
 
     public Lexer(Reader reader) throws LexerException {
-        this.reader = reader;
+        this.reader = new PushbackReader(reader);
         try {
-            this.currentChar = reader.read();
+            this.currentChar = this.reader.read();
         } catch (IOException e) {
             throw new LexerException("Failed to read from input source", line, column, e);
         }
@@ -60,9 +63,7 @@ public class Lexer {
                     return new Token(TokenType.EOF, "", line, column);
                 }
 
-                case ' ', '\t', '\r', '\n' -> {
-                    advance();
-                }
+                case ' ', '\t', '\r', '\n' -> advance();
 
                 case ';' -> {
                     advance();
@@ -279,17 +280,19 @@ public class Lexer {
         String identifier = lexeme.toString();
 
         TokenType type = KEYWORDS.get(identifier);
-        if (type != null) {
-            return new Token(type, identifier, startLine, startColumn, line, column);
-        } else {
-            return new Token(TokenType.IDENTIFIER, identifier, startLine, startColumn, line, column);
-        }
+        return new Token(Objects.requireNonNullElse(type, TokenType.IDENTIFIER),
+                         identifier,
+                         startLine,
+                         startColumn,
+                         line,
+                         column);
     }
 
     private Token scanNumberLiteral(int startLine, int startColumn) throws LexerException {
         StringBuilder lexeme = new StringBuilder();
         boolean hasDecimalPoint = false;
         boolean hasDigits = false;
+        boolean consumedDecimal = false;
 
         if (currentChar == '+' || currentChar == '-') {
             lexeme.append((char) currentChar);
@@ -303,15 +306,32 @@ public class Lexer {
         }
 
         if (currentChar == '.') {
-            hasDecimalPoint = true;
-            lexeme.append((char) currentChar);
-            advance();
-
-            while (Character.isDigit(currentChar)) {
-                lexeme.append((char) currentChar);
-                hasDigits = true;
-                advance();
+            try {
+                int next = reader.read();
+                if (next != -1 && Character.isDigit(next)) {
+                    hasDecimalPoint = true;
+                    consumedDecimal = true;
+                    lexeme.append('.');
+                    currentChar = next;
+                    column++;
+                    while (Character.isDigit(currentChar)) {
+                        lexeme.append((char) currentChar);
+                        hasDigits = true;
+                        advance();
+                    }
+                } else {
+                    // not a digit, push back
+                    if (next != -1) {
+                        reader.unread(next);
+                    }
+                }
+            } catch (IOException e) {
+                // ignore, treat as not real
             }
+        }
+
+        if (consumedDecimal && currentChar == '.') {
+            throw new LexerException("Invalid number format: multiple decimal points", startLine, startColumn);
         }
 
         if (!hasDigits) {

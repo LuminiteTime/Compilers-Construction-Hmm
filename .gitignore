@@ -6,7 +6,6 @@
 *.nar
 
 # Java package files
-*.tar.gz
 *.rar
 
 # Virtual machine crash logs
@@ -24,7 +23,6 @@ replay_pid*
 .metadata
 bin/
 tmp/
-*.tmp
 *.bak
 *.swp
 *~.nib
@@ -123,7 +121,6 @@ docs/_build/
 # Editor temporary files
 .*.swp
 .*.swo
-*~
 
 # Gradle
 .gradle/
@@ -163,13 +160,11 @@ venv/
 .env
 
 # Rust (if using any Rust tools)
-target/
 Cargo.lock
 
 # C/C++ (if integrating with native code)
 *.o
 *.a
-*.so
 *.dylib
 *.dll
 *.exe
@@ -184,3 +179,5 @@ compiler/lexer/debug_*
 compiler/lexer/test_*
 compiler/parser/debug_*
 compiler/parser/test_*
+
+tests/
