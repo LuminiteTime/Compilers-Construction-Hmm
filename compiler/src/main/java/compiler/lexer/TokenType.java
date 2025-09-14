@@ -1,3 +1,5 @@
+package compiler.lexer;
+
 public enum TokenType {
     VAR, TYPE, IS, INTEGER, REAL, BOOLEAN, ARRAY, RECORD, END,
     WHILE, LOOP, FOR, IN, REVERSE, IF, THEN, ELSE, PRINT, ROUTINE,

@@ -18,166 +18,45 @@ replay_pid*
 *.iml
 *.ipr
 *.iws
-
-# Eclipse
-.metadata
-bin/
-tmp/
-*.bak
-*.swp
-*~.nib
-local.properties
-.settings/
-.loadpath
-.recommenders
-.project
-.classpath
-
-# NetBeans
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-# IntelliJ IDEA
 out/
-!**/src/main/**/out/
-!**/src/test/**/out/
 
-# macOS
+# Gradle
+.gradle/
+build/
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# OS generated files
 .DS_Store
-.AppleDouble
-.LSOverride
-Icon
-._*
-.DocumentRevisions-V100
-.fseventsd
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.VolumeIcon.icns
-.com.apple.timemachine.donotpresent
-
-# Windows
 Thumbs.db
-Thumbs.db:encryptable
-ehthumbs.db
-ehthumbs_vista.db
-*.stackdump
 [Dd]esktop.ini
-$RECYCLE.BIN/
-*.cab
-*.msi
-*.msix
-*.msm
-*.msp
-*.lnk
 
-# Linux
+# Editor temporary files
 *~
-.fuse_hidden*
-.directory
-.Trash-*
-.nfs*
+.*.swp
+.*.swo
+*.tmp
+*.temp
 
-# Compiler specific
-# Compiled lexer/parser files
+# Logs
+*.log
+
+# Compiler specific (for potential future use)
 *.tab.c
 *.tab.h
 *.yy.c
 *.output
 *.tokens
 
-# WebAssembly files (generated)
-*.wasm
-*.wat
-
-# Temporary files
-temp_*
-*.tmp
-*.temp
-debug_*
-
-# Logs
-*.log
-*.out
-
-# Test outputs
-test_output/
-*.test
-
-# Documentation builds (if using generators)
-docs/build/
-docs/_build/
-
 # Backup files
 *.backup
 *.orig
 
-# Editor temporary files
-.*.swp
-.*.swo
-
-# Gradle
-.gradle/
-gradle-app.setting
-!gradle-wrapper.jar
-!gradle-wrapper.properties
-
-# Maven
-target/
-pom.xml.tag
-pom.xml.releaseBackup
-pom.xml.versionsBackup
-pom.xml.next
-release.properties
-dependency-reduced-pom.xml
-buildNumber.properties
-.mvn/timing.properties
-.mvn/wrapper/maven-wrapper.jar
-
-# Node.js (if using any JS tools)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-package-lock.json
-yarn.lock
-
-# Python (if using any Python tools)
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-.venv
-.env
-
-# Rust (if using any Rust tools)
-Cargo.lock
-
-# C/C++ (if integrating with native code)
-*.o
-*.a
-*.dylib
-*.dll
-*.exe
-
-# Archives
+# Archives (uncomment if needed)
 *.zip
 *.tar.gz
 *.7z
 
-# Project specific temporary files
-compiler/lexer/debug_*
-compiler/lexer/test_*
-compiler/parser/debug_*
-compiler/parser/test_*
-
-tests/
+# Test outputs (uncomment if needed)
+test_output/
+*.test

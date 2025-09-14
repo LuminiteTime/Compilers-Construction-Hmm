@@ -1,3 +1,5 @@
+package compiler.lexer;
+
 import java.io.IOException;
 import java.io.PushbackReader;
 import java.io.Reader;

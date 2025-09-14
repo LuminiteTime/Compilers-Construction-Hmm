@@ -1,3 +1,5 @@
+package compiler.lexer;
+
 public class Token {
     private final TokenType type;
     private final String lexeme;
@@ -23,34 +25,13 @@ public class Token {
         return type;
     }
 
-    public String getLexeme() {
-        return lexeme;
-    }
-
-    public int getLine() {
-        return line;
-    }
-
-    public int getColumn() {
-        return column;
-    }
-
-    public int getEndLine() {
-        return endLine;
-    }
-
-    public int getEndColumn() {
-        return endColumn;
-    }
-
     public String toString() {
         return String.format("%s:%s@%d:%d", type, lexeme, line, column);
     }
 
     public boolean equals(Object obj) {
         if (this == obj) return true;
-        if (!(obj instanceof Token)) return false;
-        Token other = (Token) obj;
+        if (!(obj instanceof Token other)) return false;
         return type == other.type &&
                lexeme.equals(other.lexeme) &&
                line == other.line &&

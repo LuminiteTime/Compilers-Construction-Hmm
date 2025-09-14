@@ -1,3 +1,5 @@
+package compiler.lexer;
+
 public class LexerException extends Exception {
     private final int line;
     private final int column;
@@ -12,13 +14,5 @@ public class LexerException extends Exception {
         super(String.format("Lexical error at line %d, column %d: %s", line, column, message), cause);
         this.line = line;
         this.column = column;
-    }
-
-    public int getLine() {
-        return line;
-    }
-
-    public int getColumn() {
-        return column;
     }
 }
