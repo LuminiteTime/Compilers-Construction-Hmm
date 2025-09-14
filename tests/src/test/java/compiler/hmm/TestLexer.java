@@ -35,7 +35,7 @@ public class TestLexer {
             var name is "test";""";
 
         List<Token> expected = Arrays.asList(
-            new Token(TokenType.VAR, "var", 12, 1),
+            new Token(TokenType.VAR, "var", 1, 1),
             new Token(TokenType.IDENTIFIER, "x", 1, 5),
             new Token(TokenType.COLON, ":", 1, 6),
             new Token(TokenType.INTEGER, "integer", 1, 8),
