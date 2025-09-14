@@ -1,5 +1,7 @@
-import java.io.*;
-import java.util.*;
+import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class TestLexer {
 
@@ -159,34 +161,36 @@ public class TestLexer {
         var comparison: boolean is (result > 10) and not (result = 15);""";
 
     private static final String TEST_10_COMPLEX_DATA_STRUCTURES =
-        "type Student is record\n" +
-        "    var id: integer;\n" +
-        "    var grade: real;\n" +
-        "end\n" +
-        "var students: array[3] Student;\n" +
-        "students[1].id := 101;\n" +
-        "students[1].grade := 85.5;\n" +
-        "for student in students loop\n" +
-        "    print student.id, student.grade;\n" +
-        "end";
+        """
+            type Student is record
+                var id: integer;
+                var grade: real;
+            end
+            var students: array[3] Student;
+            students[1].id := 101;
+            students[1].grade := 85.5;
+            for student in students loop
+                print student.id, student.grade;
+            end""";
 
     private static final String TEST_11_NESTED_RECORDS =
-        "type Address is record\n" +
-        "    var street: string;\n" +
-        "    var city: string;\n" +
-        "    var zip: integer;\n" +
-        "end\n" +
-        "type Person is record\n" +
-        "    var name: string;\n" +
-        "    var age: integer;\n" +
-        "    var address: Address;\n" +
-        "end\n" +
-        "var person: Person;\n" +
-        "person.name := \"John Doe\";\n" +
-        "person.age := 30;\n" +
-        "person.address.street := \"123 Main St\";\n" +
-        "person.address.city := \"New York\";\n" +
-        "person.address.zip := 10001;";
+        """
+            type Address is record
+                var street: string;
+                var city: string;
+                var zip: integer;
+            end
+            type Person is record
+                var name: string;
+                var age: integer;
+                var address: Address;
+            end
+            var person: Person;
+            person.name := "John Doe";
+            person.age := 30;
+            person.address.street := "123 Main St";
+            person.address.city := "New York";
+            person.address.zip := 10001;""";
 
     private static final List<Token> EXPECTED_1_VARIABLE_DECLARATIONS = Arrays.asList(
         new Token(TokenType.VAR, "var", 1, 1),
@@ -326,8 +330,8 @@ public class TestLexer {
         new Token(TokenType.FOR, "for", 1, 1),
         new Token(TokenType.IDENTIFIER, "i", 1, 5),
         new Token(TokenType.IN, "in", 1, 7),
-        new Token(TokenType.REAL_LITERAL, "1.", 1, 10),
-        new Token(TokenType.DOT, ".", 1, 12),
+        new Token(TokenType.INTEGER_LITERAL, "1", 1, 10),
+        new Token(TokenType.RANGE, "..", 1, 11),
         new Token(TokenType.INTEGER_LITERAL, "10", 1, 13),
         new Token(TokenType.LOOP, "loop", 1, 16),
         new Token(TokenType.PRINT, "print", 2, 5),
@@ -339,8 +343,8 @@ public class TestLexer {
         new Token(TokenType.FOR, "for", 4, 1),
         new Token(TokenType.IDENTIFIER, "j", 4, 5),
         new Token(TokenType.IN, "in", 4, 7),
-        new Token(TokenType.REAL_LITERAL, "10.", 4, 10),
-        new Token(TokenType.DOT, ".", 4, 13),
+        new Token(TokenType.INTEGER_LITERAL, "10", 4, 10),
+        new Token(TokenType.RANGE, "..", 4, 12),
         new Token(TokenType.INTEGER_LITERAL, "1", 4, 14),
         new Token(TokenType.REVERSE, "reverse", 4, 16),
         new Token(TokenType.LOOP, "loop", 4, 24),
