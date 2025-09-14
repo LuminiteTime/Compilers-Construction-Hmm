@@ -1,0 +1,14 @@
+plugins {
+    id 'java'
+}
+
+group = 'compiler.hmm'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // No dependencies for now
+}
