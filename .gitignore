@@ -60,3 +60,9 @@ Thumbs.db
 # Test outputs (uncomment if needed)
 test_output/
 *.test
+
+build.gradle
+gradle.properties
+gradlew
+gradlew.bat
+settings.gradle
