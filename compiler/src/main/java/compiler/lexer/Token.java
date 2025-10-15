@@ -25,14 +25,6 @@ public class Token {
         return type;
     }
 
-    public int getLine() {
-        return line;
-    }
-
-    public int getColumn() {
-        return column;
-    }
-
     public String toString() {
         return String.format("%s:%s@%d:%d", type, lexeme, line, column);
     }

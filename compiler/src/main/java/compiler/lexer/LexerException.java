@@ -15,12 +15,4 @@ public class LexerException extends Exception {
         this.line = line;
         this.column = column;
     }
-
-    public int getLine() {
-        return line;
-    }
-
-    public int getColumn() {
-        return column;
-    }
 }
