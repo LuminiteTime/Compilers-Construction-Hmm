@@ -1,0 +1,67 @@
+#ifndef TOKENS_ENUM_H
+#define TOKENS_ENUM_H
+
+// Token enum extracted from bison-generated parser.tab.h
+// This avoids circular dependencies between lexer and parser
+
+enum yytokentype
+{
+  YYEMPTY = -2,
+  YYEOF = 0,
+  YYerror = 256,
+  YYUNDEF = 310,
+  TOK_IDENTIFIER = 258,
+  TOK_STRING_LITERAL = 259,
+  TOK_INTEGER_LITERAL = 260,
+  TOK_REAL_LITERAL = 261,
+  TOK_VAR = 262,
+  TOK_TYPE = 263,
+  TOK_IS = 264,
+  TOK_INTEGER = 265,
+  TOK_REAL = 266,
+  TOK_BOOLEAN = 267,
+  TOK_ARRAY = 268,
+  TOK_RECORD = 269,
+  TOK_END = 270,
+  TOK_WHILE = 271,
+  TOK_LOOP = 272,
+  TOK_FOR = 273,
+  TOK_IN = 274,
+  TOK_REVERSE = 275,
+  TOK_IF = 276,
+  TOK_THEN = 277,
+  TOK_ELSE = 278,
+  TOK_PRINT = 279,
+  TOK_ROUTINE = 280,
+  TOK_TRUE = 281,
+  TOK_FALSE = 282,
+  TOK_AND = 283,
+  TOK_OR = 284,
+  TOK_XOR = 285,
+  TOK_NOT = 286,
+  TOK_ASSIGN = 287,
+  TOK_DOTDOT = 288,
+  TOK_PLUS = 289,
+  TOK_MINUS = 290,
+  TOK_MULTIPLY = 291,
+  TOK_DIVIDE = 292,
+  TOK_MODULO = 293,
+  TOK_LESS = 294,
+  TOK_LESS_EQUAL = 295,
+  TOK_GREATER = 296,
+  TOK_GREATER_EQUAL = 297,
+  TOK_EQUAL = 298,
+  TOK_NOT_EQUAL = 299,
+  TOK_COLON = 300,
+  TOK_SEMICOLON = 301,
+  TOK_COMMA = 302,
+  TOK_DOT = 303,
+  TOK_LPAREN = 304,
+  TOK_RPAREN = 305,
+  TOK_LBRACKET = 306,
+  TOK_RBRACKET = 307,
+  TOK_ARROW = 308,
+  TOK_EOF_TOKEN = 309
+};
+
+#endif // TOKENS_ENUM_H

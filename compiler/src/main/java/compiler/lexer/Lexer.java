@@ -117,7 +117,7 @@ public class Lexer {
                     return scanGreaterOrGreaterEqual(startLine, startColumn);
                 }
                 case '=' -> {
-                    return scanEqualOrNotEqual(startLine, startColumn);
+                    return scanEqualOrArrow(startLine, startColumn);
                 }
                 case ':' -> {
                     return scanColonOrAssign(startLine, startColumn);
@@ -207,9 +207,14 @@ public class Lexer {
         }
     }
 
-    private Token scanEqualOrNotEqual(int startLine, int startColumn) throws LexerException {
+    private Token scanEqualOrArrow(int startLine, int startColumn) throws LexerException {
         advance();
-        return new Token(TokenType.EQUAL, "=", startLine, startColumn);
+        if (currentChar == '>') {
+            advance();
+            return new Token(TokenType.ARROW, "=>", startLine, startColumn, line, column);
+        } else {
+            return new Token(TokenType.EQUAL, "=", startLine, startColumn);
+        }
     }
 
     private Token scanColonOrAssign(int startLine, int startColumn) throws LexerException {
@@ -344,6 +349,19 @@ public class Lexer {
         TokenType type = hasDecimalPoint ? TokenType.REAL_LITERAL : TokenType.INTEGER_LITERAL;
 
         return new Token(type, numberStr, startLine, startColumn, line, column);
+    }
+
+    // Native methods for JNI integration with C++ parser
+    public native void initializeParser();
+    public native boolean parseInput(String input);
+    public native int nextTokenJNI();
+    public native String getLexemeJNI();
+    public native int getTypeJNI();
+    public native int getLineJNI();
+
+    // Static initializer to load the native library
+    static {
+        System.loadLibrary("parser");
     }
 
     private void advance() throws LexerException {
