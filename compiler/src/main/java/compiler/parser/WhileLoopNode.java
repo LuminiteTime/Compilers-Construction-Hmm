@@ -1,7 +1,8 @@
 package compiler.parser;
 
-import compiler.lexer.Token;
 import java.util.List;
+
+import compiler.lexer.Token;
 
 public class WhileLoopNode extends AstNode implements StatementNode {
     private final ExpressionNode condition;

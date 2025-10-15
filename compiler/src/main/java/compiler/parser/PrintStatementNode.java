@@ -1,7 +1,8 @@
 package compiler.parser;
 
-import compiler.lexer.Token;
 import java.util.List;
+
+import compiler.lexer.Token;
 
 public class PrintStatementNode extends AstNode implements StatementNode {
     private final List<ExpressionNode> expressions;

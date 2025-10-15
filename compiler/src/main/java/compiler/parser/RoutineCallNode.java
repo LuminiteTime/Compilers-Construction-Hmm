@@ -1,7 +1,8 @@
 package compiler.parser;
 
-import compiler.lexer.Token;
 import java.util.List;
+
+import compiler.lexer.Token;
 
 public class RoutineCallNode extends AstNode implements ExpressionNode, StatementNode {
     private final String name;

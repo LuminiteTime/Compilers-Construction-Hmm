@@ -1,7 +1,6 @@
 package compiler.parser;
 
 import compiler.lexer.Token;
-import compiler.lexer.TokenType;
 
 public class PrimitiveTypeNode extends TypeNode {
     private final TypeKind kind;

@@ -1,7 +1,8 @@
 package compiler.parser;
 
-import compiler.lexer.Token;
 import java.util.List;
+
+import compiler.lexer.Token;
 
 public class ForLoopNode extends AstNode implements StatementNode {
     private final String variable;
