@@ -8,11 +8,12 @@ import java.util.Map;
 import java.util.Objects;
 
 public class Lexer {
-    private final PushbackReader reader;
+    private PushbackReader reader;
     private int currentChar;
     private int line = 1;
     private int column = 1;
     private boolean eofReached = false;
+    private Token currentToken; // Store current token for JNI access
 
     private static final Map<String, TokenType> KEYWORDS = new HashMap<>();
 
@@ -354,14 +355,105 @@ public class Lexer {
     // Native methods for JNI integration with C++ parser
     public native void initializeParser();
     public native boolean parseInput(String input);
-    public native int nextTokenJNI();
-    public native String getLexemeJNI();
-    public native int getTypeJNI();
-    public native int getLineJNI();
+
+    // JNI-accessible methods that work with current token
+    public int nextTokenJNI() throws LexerException {
+        currentToken = nextToken();
+        return tokenTypeToInt(currentToken.getType());
+    }
+
+    public String getLexemeJNI() {
+        return currentToken != null ? currentToken.getLexeme() : "";
+    }
+
+    public int getTypeJNI() {
+        return currentToken != null ? tokenTypeToInt(currentToken.getType()) : 0;
+    }
+
+    public int getLineJNI() {
+        return currentToken != null ? currentToken.getLine() : 0;
+    }
+
+    // Helper method to convert TokenType to int for C++ parser
+    private int tokenTypeToInt(TokenType type) {
+        return switch (type) {
+            case VAR -> 262;
+            case TYPE -> 263;
+            case IS -> 264;
+            case INTEGER -> 265;
+            case REAL -> 266;
+            case BOOLEAN -> 267;
+            case ARRAY -> 268;
+            case RECORD -> 269;
+            case END -> 270;
+            case WHILE -> 271;
+            case LOOP -> 272;
+            case FOR -> 273;
+            case IN -> 274;
+            case REVERSE -> 275;
+            case IF -> 276;
+            case THEN -> 277;
+            case ELSE -> 278;
+            case PRINT -> 279;
+            case ROUTINE -> 280;
+            case TRUE -> 281;
+            case FALSE -> 282;
+            case AND -> 283;
+            case OR -> 284;
+            case XOR -> 285;
+            case NOT -> 286;
+            case ASSIGN -> 287;
+            case RANGE -> 288;
+            case PLUS -> 289;
+            case MINUS -> 290;
+            case MULTIPLY -> 291;
+            case DIVIDE -> 292;
+            case MODULO -> 293;
+            case LESS -> 294;
+            case LESS_EQUAL -> 295;
+            case GREATER -> 296;
+            case GREATER_EQUAL -> 297;
+            case EQUAL -> 298;
+            case NOT_EQUAL -> 299;
+            case COLON -> 300;
+            case SEMICOLON -> 301;
+            case COMMA -> 302;
+            case DOT -> 303;
+            case LPAREN -> 304;
+            case RPAREN -> 305;
+            case LBRACKET -> 306;
+            case RBRACKET -> 307;
+            case ARROW -> 308;
+            case IDENTIFIER -> 258;
+            case INTEGER_LITERAL -> 260;
+            case REAL_LITERAL -> 261;
+            case STRING_LITERAL -> 259;
+            case EOF -> 309;
+            default -> 0;
+        };
+    }
+
+    // Method to set input for JNI parsing
+    public void setInputForJNI(String input) throws LexerException {
+        this.reader = new PushbackReader(new java.io.StringReader(input));
+        this.line = 1;
+        this.column = 1;
+        this.eofReached = false;
+        this.currentToken = null;
+        try {
+            this.currentChar = this.reader.read();
+        } catch (java.io.IOException e) {
+            throw new LexerException("Failed to read from input source", line, column, e);
+        }
+    }
 
     // Static initializer to load the native library
     static {
-        System.loadLibrary("parser");
+        try {
+            System.loadLibrary("parser");
+        } catch (UnsatisfiedLinkError e) {
+            System.err.println("Warning: Native parser library not available. JNI integration will not work.");
+        }
     }
 
     private void advance() throws LexerException {
