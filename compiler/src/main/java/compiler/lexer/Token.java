@@ -25,6 +25,26 @@ public class Token {
         return type;
     }
 
+    public String getLexeme() {
+        return lexeme;
+    }
+
+    public int getLine() {
+        return line;
+    }
+
+    public int getColumn() {
+        return column;
+    }
+
+    public int getEndLine() {
+        return endLine;
+    }
+
+    public int getEndColumn() {
+        return endColumn;
+    }
+
     public String toString() {
         return String.format("%s:%s@%d:%d", type, lexeme, line, column);
     }
