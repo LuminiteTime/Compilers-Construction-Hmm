@@ -23,4 +23,10 @@ docker run --rm -t \
   -v "${HOST_PATH}:/app" \
   -w "/app" \
   "${IMAGE}" \
-  -lc "find . -type f -name '*.sh' -exec sed -i 's/\r$//' {} + ; bash ./integration_test.sh"
+  -lc "set -euo pipefail; \
+    find . -type f -name '*.sh' -exec sed -i 's/\r$//' {} + ; \
+    bash ./integration_test.sh; \
+    export LD_LIBRARY_PATH=/app/compiler/src/main/cpp/parser; \
+    echo \"LD_LIBRARY_PATH=\$LD_LIBRARY_PATH\"; \
+    chmod +x ./gradlew; \
+    ./gradlew --no-daemon tests:test -Djava.library.path=/app/compiler/src/main/cpp/parser"
