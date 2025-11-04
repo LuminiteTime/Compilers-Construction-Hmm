@@ -1,0 +1,13 @@
+# Ignore build outputs and caches to speed up context when copying (if ever used)
+**/build/
+**/.gradle/
+**/.idea/
+**/.vscode/
+**/.git/
+**/.gitignore
+**/*.o
+**/*.so
+**/*.dll
+**/*.dylib
+**/parser
+**/libparser.*
