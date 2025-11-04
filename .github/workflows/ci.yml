@@ -3,7 +3,6 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [ main ]
 
 permissions:
   contents: read
@@ -35,20 +34,3 @@ jobs:
         name: JUnit Tests (Docker)
         path: 'tests/build/test-results/test/*.xml'
         reporter: java-junit
-
-  docker-tests:
-    name: Docker Integration Tests
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Ensure Docker is available
-      run: docker --version
-
-    - name: Run integration tests via Docker
-      shell: bash
-      run: |
-        set -euo pipefail
-        bash ./docker_test.sh
