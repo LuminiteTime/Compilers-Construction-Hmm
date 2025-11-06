@@ -387,3 +387,61 @@ bash ./docker_test.sh
 # Or run analyzer tests directly
 (cd compiler/src/main/cpp/parser && bash ./run_analyzer_tests.sh)
 ```
+
+## Test 26: Arithmetic precedence and associativity
+
+Input (`analyzer_precedence_arith.i`):
+
+```
+print 1 + 2 * 3;
+print 1 * 2 + 3;
+print 10 - 2 - 3;
+print 10 / 2 * 3;
+print 10 mod 6 mod 4;
+print (1 + 2) * 3;
+print 1 + (2 * 3);
+```
+
+Expected highlights:
+- Folded outputs show: `7, 5, 5, 15, 0, 9, 7` respectively
+
+## Test 27: Unary operator precedence
+
+Input (`analyzer_precedence_unary.i`):
+
+```
+print -1 + 2 * 3;        # -> 5
+print -(1 + 2) * 3;      # -> -9
+print +1 * -2;           # -> -2
+```
+
+Expected highlights:
+- Folded integer literals: `5, -9, -2`
+
+## Test 28: Boolean operator precedence (not > and > xor > or)
+
+Input (`analyzer_precedence_boolean.i`):
+
+```
+print true or false and false;      # -> true
+print (true or false) and false;    # -> false
+print not true or false;            # -> false
+print not (true or false);          # -> false
+print true xor false and false;     # -> true
+```
+
+Expected highlights:
+- Folded boolean literals appear accordingly
+
+## Test 29: Mixed arithmetic + boolean precedence
+
+Input (`analyzer_precedence_mixed.i`):
+
+```
+print 1 + 2 > 3 + 5 * 2;                 # -> false
+print 1 + 2 * 3 = 7 and not (2 * 2 = 5); # -> true
+print 1 + 2 * 3 = 9 or 10 / 2 + 1 = 6;   # -> true
+```
+
+Expected highlights:
+- Folded boolean literals: `false, true, true`

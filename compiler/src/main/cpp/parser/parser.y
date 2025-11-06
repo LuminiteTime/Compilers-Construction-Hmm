@@ -534,6 +534,7 @@ public:
 %type <stmtNode> while_loop for_loop if_statement print_statement
 %type <node> body range
 %type <exprNode> expression relation simple factor summand primary
+%type <exprNode> or_expr xor_expr and_expr
 %type <exprNode> modifiable_primary routine_call
 %type <node> expression_list argument_list
 
@@ -747,30 +748,43 @@ body: /* empty */ { $$ = new BodyNode(); symbolTable->enterScope(); }
     }
     ;
 
-expression: relation { $$ = $1; }
-          | expression TOK_AND relation { $$ = new BinaryOpNode(OpKind::AND, $1, $3); }
-          | expression TOK_OR relation { $$ = new BinaryOpNode(OpKind::OR, $1, $3); }
-          | expression TOK_XOR relation { $$ = new BinaryOpNode(OpKind::XOR, $1, $3); }
-          ;
-
-relation: simple { $$ = $1; }
-        | relation TOK_LESS simple { $$ = new BinaryOpNode(OpKind::LT, $1, $3); }
-        | relation TOK_LESS_EQUAL simple { $$ = new BinaryOpNode(OpKind::LE, $1, $3); }
-        | relation TOK_GREATER simple { $$ = new BinaryOpNode(OpKind::GT, $1, $3); }
-        | relation TOK_GREATER_EQUAL simple { $$ = new BinaryOpNode(OpKind::GE, $1, $3); }
-        | relation TOK_EQUAL simple { $$ = new BinaryOpNode(OpKind::EQ, $1, $3); }
-        | relation TOK_NOT_EQUAL simple { $$ = new BinaryOpNode(OpKind::NE, $1, $3); }
-        ;
-
-simple: factor { $$ = $1; }
-      | simple TOK_MULTIPLY factor { $$ = new BinaryOpNode(OpKind::MUL, $1, $3); }
-      | simple TOK_DIVIDE factor { $$ = new BinaryOpNode(OpKind::DIV, $1, $3); }
-      | simple TOK_MODULO factor { $$ = new BinaryOpNode(OpKind::MOD, $1, $3); }
+expression: or_expr { $$ = $1; }
       ;
 
+// Boolean precedence: not > and > xor > or
+or_expr: xor_expr { $$ = $1; }
+       | or_expr TOK_OR xor_expr { $$ = new BinaryOpNode(OpKind::OR, $1, $3); }
+       ;
+
+xor_expr: and_expr { $$ = $1; }
+    | xor_expr TOK_XOR and_expr { $$ = new BinaryOpNode(OpKind::XOR, $1, $3); }
+    ;
+
+and_expr: relation { $$ = $1; }
+    | and_expr TOK_AND relation { $$ = new BinaryOpNode(OpKind::AND, $1, $3); }
+    ;
+
+relation: simple { $$ = $1; }
+      | relation TOK_LESS simple { $$ = new BinaryOpNode(OpKind::LT, $1, $3); }
+      | relation TOK_LESS_EQUAL simple { $$ = new BinaryOpNode(OpKind::LE, $1, $3); }
+      | relation TOK_GREATER simple { $$ = new BinaryOpNode(OpKind::GT, $1, $3); }
+      | relation TOK_GREATER_EQUAL simple { $$ = new BinaryOpNode(OpKind::GE, $1, $3); }
+      | relation TOK_EQUAL simple { $$ = new BinaryOpNode(OpKind::EQ, $1, $3); }
+      | relation TOK_NOT_EQUAL simple { $$ = new BinaryOpNode(OpKind::NE, $1, $3); }
+        ;
+
+// Adjusted precedence: multiplication/division/modulo bind tighter than addition/subtraction
+// simple → handles addition/subtraction
+simple: factor { $$ = $1; }
+    | simple TOK_PLUS factor { $$ = new BinaryOpNode(OpKind::PLUS, $1, $3); }
+    | simple TOK_MINUS factor { $$ = new BinaryOpNode(OpKind::MINUS, $1, $3); }
+      ;
+
+// factor → handles multiplication/division/modulo
 factor: summand { $$ = $1; }
-      | factor TOK_PLUS summand { $$ = new BinaryOpNode(OpKind::PLUS, $1, $3); }
-      | factor TOK_MINUS summand { $$ = new BinaryOpNode(OpKind::MINUS, $1, $3); }
+    | factor TOK_MULTIPLY summand { $$ = new BinaryOpNode(OpKind::MUL, $1, $3); }
+    | factor TOK_DIVIDE summand { $$ = new BinaryOpNode(OpKind::DIV, $1, $3); }
+    | factor TOK_MODULO summand { $$ = new BinaryOpNode(OpKind::MOD, $1, $3); }
       ;
 
 summand: primary { $$ = $1; }

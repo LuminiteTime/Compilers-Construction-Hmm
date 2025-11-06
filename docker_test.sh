@@ -25,6 +25,7 @@ docker run --rm -t \
   "${IMAGE}" \
   -lc "set -euo pipefail; \
     find . -type f -name '*.sh' -exec sed -i 's/\r$//' {} + ; \
+    if [ -f ./gradlew ]; then sed -i 's/\r$//' ./gradlew || true; chmod +x ./gradlew || true; fi; \
     bash ./integration_test.sh; \
     export LD_LIBRARY_PATH=/app/compiler/src/main/cpp/parser; \
     echo \"LD_LIBRARY_PATH=\$LD_LIBRARY_PATH\"; \

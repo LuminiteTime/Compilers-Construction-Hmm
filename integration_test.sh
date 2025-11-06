@@ -92,6 +92,16 @@ else
                 PARSER_OK=false
             fi
             echo ""
+            echo "   Running parser precedence tests..."
+            echo "   ========================================="
+            if bash ./run_parser_precedence_tests.sh; then
+                echo -e "   ${GREEN}Parser precedence tests passed${RESET}"
+            else
+                echo -e "   ${RED}Parser precedence tests failed${RESET}"
+                PARSER_OK=false
+            fi
+            echo "   ========================================="
+            echo ""
             echo "   Running analyzer tests..."
             echo "   ========================================="
             if bash ./run_analyzer_tests.sh; then

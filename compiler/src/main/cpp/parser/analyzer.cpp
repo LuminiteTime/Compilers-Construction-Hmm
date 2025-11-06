@@ -385,6 +385,16 @@ void Analyzer::simplifyInBody(BodyNode* body) {
             newStmts.push_back(asg);
             continue;
         }
+        if (auto* pr = dynamic_cast<PrintStatementNode*>(s)) {
+            if (auto* el = dynamic_cast<ExpressionListNode*>(pr->expressions)) {
+                for (auto*& e : el->expressions) {
+                    auto* folded = foldExpression(e);
+                    if (folded != e) { result.optimizationsApplied++; e = folded; }
+                }
+            }
+            newStmts.push_back(pr);
+            continue;
+        }
         if (auto* iff = dynamic_cast<IfStatementNode*>(s)) {
             iff->condition = foldExpression(iff->condition);
             bool val;
@@ -480,6 +490,13 @@ void Analyzer::simplifyInProgram(ProgramNode* program) {
             if (auto* b = dynamic_cast<BodyNode*>(wh->body)) simplifyInBody(b);
         } else if (auto* asg = dynamic_cast<AssignmentNode*>(s)) {
             asg->value = foldExpression(asg->value);
+        } else if (auto* pr = dynamic_cast<PrintStatementNode*>(s)) {
+            if (auto* el = dynamic_cast<ExpressionListNode*>(pr->expressions)) {
+                for (auto*& e : el->expressions) {
+                    auto* folded = foldExpression(e);
+                    if (folded != e) { result.optimizationsApplied++; e = folded; }
+                }
+            }
         }
         newStmts.push_back(s);
     }

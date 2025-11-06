@@ -187,6 +187,36 @@ run_and_expect analyzer_routine_call_type_mismatch.i \
   "error: Argument type mismatch in call to 'f' at position 1" \
   "error: Argument type mismatch in call to 'f' at position 2"
 
+# 26) Arithmetic precedence and associativity
+run_and_expect analyzer_precedence_arith.i \
+  "IntegerLiteral: 7" \
+  "IntegerLiteral: 5" \
+  "IntegerLiteral: 5" \
+  "RealLiteral: 15" \
+  "IntegerLiteral: 0" \
+  "IntegerLiteral: 9" \
+  "IntegerLiteral: 7"
+
+# 27) Unary operator precedence
+run_and_expect analyzer_precedence_unary.i \
+  "IntegerLiteral: 5" \
+  "IntegerLiteral: -9" \
+  "IntegerLiteral: -2"
+
+# 28) Boolean operator precedence (not > and > xor > or)
+run_and_expect analyzer_precedence_boolean.i \
+  "BooleanLiteral: true" \
+  "BooleanLiteral: false" \
+  "BooleanLiteral: false" \
+  "BooleanLiteral: false" \
+  "BooleanLiteral: true"
+
+# 29) Mixed arithmetic + boolean precedence
+run_and_expect analyzer_precedence_mixed.i \
+  "BooleanLiteral: false" \
+  "BooleanLiteral: true" \
+  "BooleanLiteral: true"
+
 if [ $failures -gt 0 ]; then
   echo -e "${RED}Analyzer tests: $failures failure(s)${RESET}" >&2
   exit 1
