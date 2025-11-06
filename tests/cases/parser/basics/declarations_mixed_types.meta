@@ -1,0 +1,4 @@
+# Parser basics: declarations of mixed types
+parseErr=0
+expect: Optimizations applied:
+expect: Program

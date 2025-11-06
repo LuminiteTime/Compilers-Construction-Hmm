@@ -1,0 +1,4 @@
+# Analyzer: while condition must be boolean (parse error)
+parseErr=1
+expect: Parse error
+expect: While condition must be boolean

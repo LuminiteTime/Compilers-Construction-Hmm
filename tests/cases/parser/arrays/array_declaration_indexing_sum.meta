@@ -1,0 +1,4 @@
+# Parser arrays: declaration, indexing, and sum
+parseErr=0
+expect: Optimizations applied:
+expect: Program

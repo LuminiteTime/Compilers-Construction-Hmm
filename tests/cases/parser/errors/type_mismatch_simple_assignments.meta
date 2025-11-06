@@ -1,0 +1,3 @@
+# Parser errors: simple type mismatches in assignments
+parseErr=1
+expect: error:

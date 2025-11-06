@@ -1,0 +1,4 @@
+# Analyzer: else-branch hoist and fold
+parseErr=0
+expect: IntegerLiteral: 4
+expect: PrintStatement

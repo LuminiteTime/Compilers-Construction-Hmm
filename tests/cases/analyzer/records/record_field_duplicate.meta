@@ -1,0 +1,3 @@
+# Analyzer: record field duplicate
+parseErr=0
+expect: error: Duplicate field 'x' in type 'Point'

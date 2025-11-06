@@ -1,0 +1,3 @@
+# Analyzer: hoist naming conflict
+parseErr=0
+expect: error: Duplicate variable declaration 'a' in same scope

@@ -1,0 +1,4 @@
+# Analyzer: array index and bounds
+parseErr=0
+expect: error: Array index must be integer
+expect: warning: Array index 4 out of bounds [1..3] (static)

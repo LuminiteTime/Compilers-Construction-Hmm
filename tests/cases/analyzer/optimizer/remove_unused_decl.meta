@@ -1,0 +1,3 @@
+# Analyzer: remove unused declaration
+parseErr=0
+expect: Optimizations applied:

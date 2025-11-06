@@ -1,0 +1,3 @@
+# Parser errors: missing semicolon
+parseErr=1
+expect: syntax error

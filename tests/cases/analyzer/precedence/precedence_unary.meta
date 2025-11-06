@@ -1,0 +1,5 @@
+# Analyzer precedence: unary
+parseErr=0
+expect: IntegerLiteral: 5
+expect: IntegerLiteral: -9
+expect: IntegerLiteral: -2

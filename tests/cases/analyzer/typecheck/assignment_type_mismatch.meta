@@ -1,0 +1,4 @@
+# Analyzer: assignment type mismatch (parse error expected)
+parseErr=1
+expect: Parse error
+expect: Type mismatch in assignment

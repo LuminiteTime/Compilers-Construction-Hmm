@@ -1,0 +1,4 @@
+# Parser basics: single print
+parseErr=0
+expect: PrintStatement
+expect: IntegerLiteral: 42

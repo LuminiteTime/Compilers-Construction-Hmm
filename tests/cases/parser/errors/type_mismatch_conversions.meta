@@ -1,0 +1,3 @@
+# Parser errors: invalid implicit conversions and assignments
+parseErr=1
+expect: error:

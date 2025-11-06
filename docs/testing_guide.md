@@ -326,33 +326,24 @@ Integration tests verify that the Java lexer and C++ parser work together correc
 ### Running Integration Tests
 
 ```bash
-# Run the comprehensive integration test
-./integration_test.sh
+# Run the full suite in Docker (native harness + JUnit)
+bash ./docker_test.sh
 ```
 
-This script performs:
-1. **Java Component Testing**: Compiles and runs lexer unit tests
-2. **C++ Component Testing**: Builds and runs parser test suite
-3. **System Integration Check**: Verifies both components are available and compatible
+This will:
+1. Build the Docker image and toolchain
+2. Build the native parser and run the unified test harness under `tests/cases/**`
+3. Run Java lexer tests via Gradle
 
 ### Integration Test Results
 
-The integration test provides a summary:
+The Docker run provides a summary:
 
 ```
-=== INTEGRATION TEST ===
-
-1. Testing Java Lexer...
-✓ Java lexer tests passed
-
-2. Testing C++ Parser...
-✓ C++ parser compiled successfully
-✓ Parser tests: 10/10 passed
-
-3. Integration Status...
-✓ Both Java and C++ components are available
-✓ JNI integration code is present
-✓ Integration framework is ready
+=== Running tests ===
+... per-suite results ...
+All N tests passed
+... Gradle summary ...
 ```
 
 ### Manual Integration Testing

@@ -1,0 +1,5 @@
+# Analyzer: hoist and fold
+parseErr=0
+expect: IntegerLiteral: 8
+expect: IntegerLiteral: 3
+expect: PrintStatement

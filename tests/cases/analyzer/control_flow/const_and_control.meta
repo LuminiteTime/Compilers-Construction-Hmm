@@ -1,0 +1,5 @@
+# Analyzer: const and control
+parseErr=0
+expect: Optimizations applied:
+expect: PrintStatement
+expect: IntegerLiteral: 8

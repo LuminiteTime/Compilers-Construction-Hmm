@@ -1,0 +1,4 @@
+# Parser records: declaration and field assignment
+parseErr=0
+expect: Optimizations applied:
+expect: Program

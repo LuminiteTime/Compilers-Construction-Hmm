@@ -1,0 +1,4 @@
+# Analyzer: routine call type mismatch
+parseErr=0
+expect: error: Argument type mismatch in call to 'f' at position 1
+expect: error: Argument type mismatch in call to 'f' at position 2

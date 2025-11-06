@@ -1,0 +1,4 @@
+# Parser precedence: arithmetic + comparison + not
+parseErr=0
+expect: Optimizations applied:
+expect: Program

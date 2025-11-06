@@ -1,0 +1,9 @@
+# Analyzer precedence: arithmetic
+parseErr=0
+expect: IntegerLiteral: 7
+expect: IntegerLiteral: 5
+expect: IntegerLiteral: 5
+expect: RealLiteral: 15
+expect: IntegerLiteral: 0
+expect: IntegerLiteral: 9
+expect: IntegerLiteral: 7

@@ -2,7 +2,7 @@
 
 This document captures the analyzer-specific tests, their input programs, and the expected diagnostics/transformations.
 
-Each test is executable via `compiler/src/main/cpp/parser/run_analyzer_tests.sh` (also run by `integration_test.sh`/`docker_test.sh`).
+Each test can be executed via the unified harness: `bash tests/harness/run.sh --suite analyzer` (also run by `docker_test.sh`).
 
 ## Test 1: Constant folding and control simplification
 
@@ -384,8 +384,8 @@ Run locally (optional):
 ```
 # In project root
 bash ./docker_test.sh
-# Or run analyzer tests directly
-(cd compiler/src/main/cpp/parser && bash ./run_analyzer_tests.sh)
+# Or run analyzer tests directly via the harness
+bash tests/harness/run.sh --suite analyzer
 ```
 
 ## Test 26: Arithmetic precedence and associativity

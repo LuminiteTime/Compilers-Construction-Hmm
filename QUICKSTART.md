@@ -14,9 +14,9 @@ make clean && make
 cd ../../../
 ```
 
-### 2. Запуск интеграционного теста
+### 2. Запуск тестов в Docker
 ```bash
-./integration_test.sh
+bash ./docker_test.sh
 ```
 
 ### 3. Ручное тестирование
