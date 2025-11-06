@@ -10,6 +10,7 @@ BISON_SRC = parser.y
 LEX_SRC = lexer.l
 AST_SRC = ast.cpp
 SYMBOL_SRC = symbol.cpp
+ANALYZER_SRC = analyzer.cpp
 LEXER_SRC = lexer.cpp
 JNI_SRC = jni_lexer.cpp
 
@@ -24,6 +25,7 @@ BISON_OBJ = parser.tab.o
 LEX_OBJ = lex.yy.o
 AST_OBJ = ast.o
 SYMBOL_OBJ = symbol.o
+ANALYZER_OBJ = analyzer.o
 LEXER_OBJ = lexer.o
 JNI_OBJ = jni_lexer.o
 
@@ -38,10 +40,10 @@ JNI_INCLUDES = -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux -I.
 
 all: $(JNI_H) $(TARGET) $(EXECUTABLE)
 
-$(EXECUTABLE): $(BISON_OBJ) $(LEX_OBJ) $(AST_OBJ) $(SYMBOL_OBJ) $(LEXER_OBJ) $(JNI_OBJ)
+$(EXECUTABLE): $(BISON_OBJ) $(LEX_OBJ) $(AST_OBJ) $(SYMBOL_OBJ) $(ANALYZER_OBJ) $(LEXER_OBJ) $(JNI_OBJ)
 	$(CXX) $(CXXFLAGS) -fPIC -o $@ $^ $(JNI_INCLUDES)
 
-$(TARGET): $(BISON_OBJ) $(LEX_OBJ) $(AST_OBJ) $(SYMBOL_OBJ) $(LEXER_OBJ) $(JNI_OBJ)
+$(TARGET): $(BISON_OBJ) $(LEX_OBJ) $(AST_OBJ) $(SYMBOL_OBJ) $(ANALYZER_OBJ) $(LEXER_OBJ) $(JNI_OBJ)
 	$(CXX) $(CXXFLAGS) -shared -fPIC -Wl,--no-as-needed -o $@ $^ $(JNI_INCLUDES)
 
 $(BISON_C) $(BISON_H): $(BISON_SRC)
