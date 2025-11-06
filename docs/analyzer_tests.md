@@ -292,6 +292,93 @@ end
 Expected diagnostics:
 - `error: Duplicate field 'x' in type 'Point'`
 
+## Test 19: For-loop over numeric range (OK)
+
+Input (`analyzer_for_range_ok.i`):
+
+```
+for i in 1 .. 3 loop
+  print i;
+end
+```
+
+Expected highlights:
+- AST contains a `ForLoop` node and a `PrintStatement` inside the loop body.
+
+## Test 20: For-loop numeric range type error
+
+Input (`analyzer_for_range_type_error.i`):
+
+```
+for i in 1.0 .. 3 loop
+end
+```
+
+Expected diagnostics:
+- `error: For range bounds must be integers`
+
+## Test 21: For-in over array (OK)
+
+Input (`analyzer_for_in_array_ok.i`):
+
+```
+var arr: array[3] integer;
+for i in arr loop
+  print i;
+end
+```
+
+Expected highlights:
+- AST contains a `ForLoop` node and a `PrintStatement` inside the loop body.
+
+## Test 22: Print with multiple expressions
+
+Input (`analyzer_print_multiple.i`):
+
+```
+print 1, 2, 3;
+```
+
+Expected highlights:
+- AST contains `PrintStatement` with three integer literals (`1`, `2`, `3`).
+
+## Test 23: Routine call — undefined routine (parser-level)
+
+Input (`analyzer_routine_call_undefined.i`):
+
+```
+foo(1);
+```
+
+Expected diagnostics:
+- Parser prints `Parse error ... Undefined routine` (the analyzer harness treats this as PASS by checking for that text).
+
+## Test 24: Routine call — arity mismatch (parser-level)
+
+Input (`analyzer_routine_call_arity_mismatch.i`):
+
+```
+routine add(a: integer, b: integer): integer => a + b
+add(1);
+```
+
+Expected diagnostics:
+- Parser prints `Parse error ... Argument mismatch` (the analyzer harness treats this as PASS by checking for that text).
+
+## Test 25: Routine call — parameter type mismatch (analyzer-level)
+
+Input (`analyzer_routine_call_type_mismatch.i`):
+
+```
+routine f(a: integer, b: boolean): integer => a
+var x: integer is 0;
+f(1.0, 2);
+```
+
+Expected diagnostics:
+- `error: Argument type mismatch in call to 'f' at position 1`
+- `error: Argument type mismatch in call to 'f' at position 2`
+
 Run locally (optional):
 
 ```
