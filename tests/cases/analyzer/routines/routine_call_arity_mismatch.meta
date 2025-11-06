@@ -1,0 +1,4 @@
+# Analyzer: routine call arity mismatch (parse error)
+parseErr=1
+expect: Parse error
+expect: Argument mismatch

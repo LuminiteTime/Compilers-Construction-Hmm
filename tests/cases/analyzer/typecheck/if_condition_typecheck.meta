@@ -1,0 +1,4 @@
+# Analyzer: if condition must be boolean (parse error)
+parseErr=1
+expect: Parse error
+expect: If condition must be boolean

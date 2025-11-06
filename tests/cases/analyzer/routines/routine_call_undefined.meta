@@ -1,0 +1,4 @@
+# Analyzer: routine call undefined (parse error)
+parseErr=1
+expect: Parse error
+expect: Undefined routine

@@ -1,0 +1,5 @@
+# Analyzer: hoist nested
+parseErr=0
+expect: IntegerLiteral: 2
+expect: IntegerLiteral: 4
+expect: PrintStatement

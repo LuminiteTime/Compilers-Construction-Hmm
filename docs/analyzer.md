@@ -125,7 +125,7 @@ In Docker (recommended for consistent toolchains):
 bash ./docker_test.sh
 ```
 
-This builds a container, runs `integration_test.sh`, which builds the parser, runs the original tests, then runs the analyzer tests.
+This builds a container and runs the unified test harness (native parser/analyzer tests) and Java tests.
 
 ## Test suite additions
 

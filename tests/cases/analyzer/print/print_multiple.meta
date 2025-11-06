@@ -1,0 +1,6 @@
+# Analyzer: print multiple expressions
+parseErr=0
+expect: PrintStatement
+expect: IntegerLiteral: 1
+expect: IntegerLiteral: 2
+expect: IntegerLiteral: 3

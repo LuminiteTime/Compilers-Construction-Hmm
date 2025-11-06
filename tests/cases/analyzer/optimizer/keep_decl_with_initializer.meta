@@ -1,0 +1,3 @@
+# Analyzer: keep unused decl with initializer (folded)
+parseErr=0
+expect: IntegerLiteral: 3

@@ -1,0 +1,4 @@
+# Parser control flow (for): ranges and reverse ranges
+parseErr=0
+expect: Optimizations applied:
+expect: Program

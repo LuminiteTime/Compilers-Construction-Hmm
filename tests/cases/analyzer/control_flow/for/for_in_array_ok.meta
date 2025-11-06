@@ -1,0 +1,4 @@
+# Analyzer: for-in over array ok
+parseErr=0
+expect: ForLoop
+expect: PrintStatement

@@ -1,0 +1,4 @@
+# Parser control flow (for-each): record array iteration and print
+parseErr=0
+expect: Optimizations applied:
+expect: Program

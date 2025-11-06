@@ -1,0 +1,4 @@
+# Parser basics: integer variable initialization
+parseErr=0
+expect: Optimizations applied:
+expect: Program

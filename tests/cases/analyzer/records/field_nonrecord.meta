@@ -1,0 +1,3 @@
+# Analyzer: field access on non-record
+parseErr=0
+expect: error: Field access on non-record type

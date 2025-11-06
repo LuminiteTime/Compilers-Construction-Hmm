@@ -1,0 +1,4 @@
+# Analyzer: while false nested
+parseErr=0
+expect: Optimizations applied:
+expect: IntegerLiteral: 42

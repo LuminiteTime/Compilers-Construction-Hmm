@@ -1,0 +1,4 @@
+# Parser control flow (while): countdown print
+parseErr=0
+expect: Optimizations applied:
+expect: Program

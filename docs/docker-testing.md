@@ -18,7 +18,23 @@ From the project root:
 What this does:
 - Builds a Docker image with build tools (gcc/g++, make), bison, flex, and JDK 21
 - Mounts the current workspace into the container
-- Runs `./integration_test.sh` inside the container
+- Runs the unified test harness (`tests/harness/run.sh`) and Java tests inside the container
+
+You can filter inside Docker too:
+
+```bash
+# Only analyzer suite
+bash ./docker_test.sh --suite analyzer
+
+# Filter tests by name pattern
+bash ./docker_test.sh --filter "range"
+
+# Combine with verbose output
+bash ./docker_test.sh --suite analyzer --verbose
+
+# Run only Java lexer tests
+bash ./docker_test.sh --suite lexer
+```
 
 ## Notes
 

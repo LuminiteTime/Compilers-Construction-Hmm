@@ -1,0 +1,3 @@
+# Analyzer: for range type error
+parseErr=0
+expect: error: For range bounds must be integers

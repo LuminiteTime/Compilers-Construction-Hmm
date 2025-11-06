@@ -1,0 +1,3 @@
+# Analyzer: routine return mismatch
+parseErr=0
+expect: error: Routine 'f' return type mismatch

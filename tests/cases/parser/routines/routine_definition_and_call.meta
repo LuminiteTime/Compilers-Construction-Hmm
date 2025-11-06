@@ -1,0 +1,4 @@
+# Parser routines: definition and call
+parseErr=0
+expect: Optimizations applied:
+expect: Program

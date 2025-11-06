@@ -1,0 +1,3 @@
+# Analyzer: post-optimization undefined
+parseErr=0
+expect: error: Undefined variable 'y'

@@ -1,0 +1,3 @@
+# Analyzer: boolean folding
+parseErr=0
+expect: BooleanLiteral: true

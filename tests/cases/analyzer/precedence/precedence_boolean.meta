@@ -1,0 +1,7 @@
+# Analyzer precedence: boolean
+parseErr=0
+expect: BooleanLiteral: true
+expect: BooleanLiteral: false
+expect: BooleanLiteral: false
+expect: BooleanLiteral: false
+expect: BooleanLiteral: true

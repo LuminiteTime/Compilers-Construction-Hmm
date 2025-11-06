@@ -31,10 +31,10 @@ make clean && make
 cd ../../../
 ```
 
-#### Run Integration Test
+#### Run Tests in Docker
 ```bash
-# Run comprehensive integration test
-./integration_test.sh
+# Run the full test suite in Docker (native harness + Java tests)
+bash ./docker_test.sh
 ```
 
 ### 4.2 Individual Component Testing
