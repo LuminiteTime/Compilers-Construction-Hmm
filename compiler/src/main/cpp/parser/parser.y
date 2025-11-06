@@ -9,6 +9,7 @@
 #include "ast.h"      // AST node definitions
 #include "symbol.h"   // Symbol table classes
 #include "lexer.h"    // Java lexer interface
+#include "analyzer.h" // Semantic analyzer
 
 // External lexer interface functions
 extern int yylex();
@@ -477,6 +478,19 @@ public:
 class WASMGenerator {
 public:
     void generate(ProgramNode* root) {
+        // Run analyzer before printing/generating code
+        Analyzer analyzer(/*enableOptimizations=*/true);
+        Analyzer::Result res = analyzer.analyze(root);
+        if (!res.errors.empty()) {
+            std::cout << "=== SEMANTIC ERRORS ===" << std::endl;
+            for (auto& e : res.errors) std::cout << "error: " << e << std::endl;
+        }
+        if (!res.warnings.empty()) {
+            std::cout << "=== SEMANTIC WARNINGS ===" << std::endl;
+            for (auto& w : res.warnings) std::cout << "warning: " << w << std::endl;
+        }
+        std::cout << "Optimizations applied: " << res.optimizationsApplied << std::endl;
+
         ASTTreePrinter printer;
         printer.printTree(root);
     }
@@ -830,7 +844,7 @@ int main(int argc, char** argv) {
     // Parse input
     int result = yyparse();
 
-    // Generate WASM code from AST (stub)
+    // Generate output (runs analyzer + prints AST)
     if (result == 0 && astRoot && !hasParseError) {
         WASMGenerator generator;
         generator.generate(astRoot);

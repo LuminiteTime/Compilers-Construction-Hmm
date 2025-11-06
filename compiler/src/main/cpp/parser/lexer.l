@@ -16,7 +16,7 @@ extern int yylineno;
 
 %%
 
-[ \t]           ;  // ignore whitespace
+[ \t\r]+        ;  // ignore whitespace (include CR for Windows line endings)
 \n              { yylineno++; }
 
 "var"           { return TOK_VAR; }

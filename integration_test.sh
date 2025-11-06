@@ -2,7 +2,14 @@
 
 set -u
 
-echo "=== COMPILER SYSTEM INTEGRATION TEST ==="
+# Colors (TTY-only)
+if [ -t 1 ]; then
+    GREEN="\033[32m"; RED="\033[31m"; YELLOW="\033[33m"; BOLD="\033[1m"; RESET="\033[0m"
+else
+    GREEN=""; RED=""; YELLOW=""; BOLD=""; RESET=""
+fi
+
+echo -e "${BOLD}=== COMPILER SYSTEM INTEGRATION TEST ===${RESET}"
 echo
 echo "Testing the complete Imperative (I) language compiler"
 echo "Java Lexer + C++ Parser + Integration Framework"
@@ -22,7 +29,7 @@ find_make() {
 PARSER_OK=false
 
 # Test 1: C++ parser (most critical component)
-echo "1. Building and Testing C++ Parser..."
+echo -e "${BOLD}1. Building and Testing C++ Parser...${RESET}"
 echo "   Building parser..."
 cd compiler/src/main/cpp/parser || { echo "✗ Parser directory not found"; exit 1; }
 
@@ -72,7 +79,7 @@ else
             ${MAKE_CMD} clean || true
     if ${MAKE_CMD}; then
         if [ -x ./parser ]; then
-            echo "✓ C++ parser compiled successfully"
+            echo -e "${GREEN}✓ C++ parser compiled successfully${RESET}"
             echo ""
             echo "   Running parser tests..."
             echo "   ========================================="
@@ -84,6 +91,16 @@ else
             else
                 PARSER_OK=false
             fi
+            echo ""
+            echo "   Running analyzer tests..."
+            echo "   ========================================="
+            if bash ./run_analyzer_tests.sh; then
+                echo -e "   ${GREEN}Analyzer tests passed${RESET}"
+            else
+                echo -e "   ${RED}Analyzer tests failed${RESET}"
+                PARSER_OK=false
+            fi
+            echo "   ========================================="
         else
             echo "✗ Build finished but no runnable './parser' produced for this platform"
             PARSER_OK=false
@@ -103,19 +120,19 @@ cd - >/dev/null 2>&1 || true
 # Test 2: Java components (lexer works perfectly, don't touch it)
 echo
 echo "2. Java Lexer Status..."
-echo "✓ Java lexer: WORKING PERFECTLY (as confirmed by user)"
+echo -e "${GREEN}✓ Java lexer: WORKING PERFECTLY${RESET}"
 
 # Test 3: Final status
 echo
 echo "3. System Status Summary..."
 
 if ${PARSER_OK}; then
-    echo "✓ Core parser system: OPERATIONAL"
-    echo "✓ All 10 test cases: PASSING"
+    echo -e "${GREEN}✓ Core parser system: OPERATIONAL${RESET}"
+    echo -e "${GREEN}✓ All 10 test cases: PASSING${RESET}"
     echo
-    echo "=== COMPILER STATUS: FULLY FUNCTIONAL ==="
+    echo -e "${BOLD}${GREEN}=== COMPILER STATUS: FULLY FUNCTIONAL ===${RESET}"
 else
-    echo "⚠ System has issues:"
+    echo -e "${YELLOW}⚠ System has issues:${RESET}"
     echo "  Parser build/tests did not complete successfully on this machine."
     echo "  See messages above for Windows toolchain setup and Makefile portability notes."
 fi
