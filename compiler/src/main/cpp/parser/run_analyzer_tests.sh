@@ -151,6 +151,42 @@ run_and_expect_parse_error analyzer_while_condition_typecheck.i \
 run_and_expect analyzer_record_field_duplicate.i \
   "error: Duplicate field 'x' in type 'Point'"
 
+# 19) For-loop over numeric range OK
+run_and_expect analyzer_for_range_ok.i \
+  "ForLoop" \
+  "PrintStatement"
+
+# 20) For-loop numeric range type error (non-integer bound)
+run_and_expect analyzer_for_range_type_error.i \
+  "error: For range bounds must be integers"
+
+# 21) For-in over array OK
+run_and_expect analyzer_for_in_array_ok.i \
+  "ForLoop" \
+  "PrintStatement"
+
+# 22) Print with multiple expressions
+run_and_expect analyzer_print_multiple.i \
+  "PrintStatement" \
+  "IntegerLiteral: 1" \
+  "IntegerLiteral: 2" \
+  "IntegerLiteral: 3"
+
+# 23) Routine call: undefined routine (parse error expected)
+run_and_expect_parse_error analyzer_routine_call_undefined.i \
+  "Parse error" \
+  "Undefined routine"
+
+# 24) Routine call: arity mismatch (parse error expected)
+run_and_expect_parse_error analyzer_routine_call_arity_mismatch.i \
+  "Parse error" \
+  "Argument mismatch"
+
+# 25) Routine call: parameter type mismatch (analyzer error)
+run_and_expect analyzer_routine_call_type_mismatch.i \
+  "error: Argument type mismatch in call to 'f' at position 1" \
+  "error: Argument type mismatch in call to 'f' at position 2"
+
 if [ $failures -gt 0 ]; then
   echo -e "${RED}Analyzer tests: $failures failure(s)${RESET}" >&2
   exit 1

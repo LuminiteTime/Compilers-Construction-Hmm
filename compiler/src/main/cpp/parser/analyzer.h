@@ -46,4 +46,4 @@ private:
     void collectUsedVariables(ASTNode* node, std::unordered_set<std::string>& used);
 };
 
-#endif // ANALYZER_H
+#endif

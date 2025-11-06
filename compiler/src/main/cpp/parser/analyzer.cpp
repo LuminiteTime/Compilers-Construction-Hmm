@@ -24,10 +24,6 @@ Analyzer::Result Analyzer::analyze(ProgramNode* root) {
     runChecks(root);
     if (enableOpts && result.errors.empty()) {
         runOptimizations(root);
-        // Post-optimization sanity checks (e.g., assignments to undeclared variables)
-        // This helps catch cases where dead-branch elimination removed declarations
-        // but later statements still reference those variables.
-        // We run this even if symbol table scopes were permissive during parse.
         struct {
             void collectGlobals(ProgramNode* prog, std::unordered_set<std::string>& globals) {
                 for (auto* d : prog->declarations) {
@@ -74,8 +70,6 @@ Analyzer::Result Analyzer::analyze(ProgramNode* root) {
                             for (auto* e : el->expressions) checkExprForUndefined(e, globals, res);
                         }
                     }
-                    // Intentionally avoid descending into bodies to prevent false positives
-                    // for properly scoped variables that still exist in non-constant branches.
                 }
             }
         } post;
@@ -398,10 +392,7 @@ void Analyzer::simplifyInBody(BodyNode* body) {
                 BodyNode* chosen = val ? dynamic_cast<BodyNode*>(iff->thenBody)
                                        : dynamic_cast<BodyNode*>(iff->elseBody);
                 if (chosen) {
-                    // First, simplify inside the chosen body to surface nested constant branches
                     simplifyInBody(chosen);
-                    // Hoist declarations from the chosen branch into the current body scope
-                    // Detect naming conflicts with existing declarations in this body
                     std::unordered_set<std::string> existing;
                     for (auto* d : body->declarations) {
                         if (auto* vd = dynamic_cast<VariableDeclarationNode*>(d)) existing.insert(vd->name);
@@ -411,7 +402,6 @@ void Analyzer::simplifyInBody(BodyNode* body) {
                             if (existing.find(vd->name) != existing.end()) {
                                 result.errors.push_back("Duplicate variable declaration '" + vd->name + "' in same scope");
                             } else {
-                                // Fold initializer of hoisted declaration
                                 if (vd->initializer) {
                                     auto* folded = foldExpression(vd->initializer);
                                     if (folded != vd->initializer) { result.optimizationsApplied++; vd->initializer = folded; }
@@ -421,7 +411,6 @@ void Analyzer::simplifyInBody(BodyNode* body) {
                             }
                         }
                     }
-                    // Splice statements from the chosen branch
                     for (auto* inner : chosen->statements) newStmts.push_back(inner);
                 }
                 result.optimizationsApplied++;
@@ -457,9 +446,7 @@ void Analyzer::simplifyInProgram(ProgramNode* program) {
                 BodyNode* chosen = val ? dynamic_cast<BodyNode*>(iff->thenBody)
                                        : dynamic_cast<BodyNode*>(iff->elseBody);
                 if (chosen) {
-                    // Simplify inside chosen to hoist nested constant branches up to this body first
                     simplifyInBody(chosen);
-                    // Hoist declarations into program scope with conflict detection
                     std::unordered_set<std::string> existing;
                     for (auto* d : program->declarations) {
                         if (auto* vd = dynamic_cast<VariableDeclarationNode*>(d)) existing.insert(vd->name);
@@ -469,7 +456,6 @@ void Analyzer::simplifyInProgram(ProgramNode* program) {
                             if (existing.find(vd->name) != existing.end()) {
                                 result.errors.push_back("Duplicate variable declaration '" + vd->name + "' in same scope");
                             } else {
-                                // Fold initializer of hoisted declaration
                                 if (vd->initializer) {
                                     auto* folded = foldExpression(vd->initializer);
                                     if (folded != vd->initializer) { result.optimizationsApplied++; vd->initializer = folded; }
@@ -479,7 +465,6 @@ void Analyzer::simplifyInProgram(ProgramNode* program) {
                             }
                         }
                     }
-                    // Splice statements from the chosen branch
                     for (auto* inner : chosen->statements) newStmts.push_back(inner);
                 }
                 result.optimizationsApplied++;
