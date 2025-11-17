@@ -13,6 +13,7 @@ SYMBOL_SRC = symbol.cpp
 ANALYZER_SRC = analyzer.cpp
 LEXER_SRC = lexer.cpp
 JNI_SRC = jni_lexer.cpp
+CODEGEN_SRC = codegen_bridge.cpp
 
 # Generated files
 BISON_C = parser.tab.c
@@ -28,6 +29,7 @@ SYMBOL_OBJ = symbol.o
 ANALYZER_OBJ = analyzer.o
 LEXER_OBJ = lexer.o
 JNI_OBJ = jni_lexer.o
+CODEGEN_OBJ = codegen_bridge.o
 
 # Shared library
 TARGET = libparser.so
@@ -40,10 +42,10 @@ JNI_INCLUDES = -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux -I.
 
 all: $(JNI_H) $(TARGET) $(EXECUTABLE)
 
-$(EXECUTABLE): $(BISON_OBJ) $(LEX_OBJ) $(AST_OBJ) $(SYMBOL_OBJ) $(ANALYZER_OBJ) $(LEXER_OBJ) $(JNI_OBJ)
+$(EXECUTABLE): $(BISON_OBJ) $(LEX_OBJ) $(AST_OBJ) $(SYMBOL_OBJ) $(ANALYZER_OBJ) $(LEXER_OBJ) $(JNI_OBJ) $(CODEGEN_OBJ)
 	$(CXX) $(CXXFLAGS) -fPIC -o $@ $^ $(JNI_INCLUDES)
 
-$(TARGET): $(BISON_OBJ) $(LEX_OBJ) $(AST_OBJ) $(SYMBOL_OBJ) $(ANALYZER_OBJ) $(LEXER_OBJ) $(JNI_OBJ)
+$(TARGET): $(BISON_OBJ) $(LEX_OBJ) $(AST_OBJ) $(SYMBOL_OBJ) $(ANALYZER_OBJ) $(LEXER_OBJ) $(JNI_OBJ) $(CODEGEN_OBJ)
 	$(CXX) $(CXXFLAGS) -shared -fPIC -Wl,--no-as-needed -o $@ $^ $(JNI_INCLUDES)
 
 $(BISON_C) $(BISON_H): $(BISON_SRC)
@@ -65,6 +67,7 @@ ast.o: ast.h
 symbol.o: symbol.h ast.h
 lexer.o: lexer.h
 jni_lexer.o: lexer.h $(JNI_H)
+codegen_bridge.o: ast.h symbol.h analyzer.h
 
 clean:
 	rm -f $(BISON_C) $(BISON_H) $(LEX_C) $(JNI_H) *.o $(TARGET) $(EXECUTABLE)
