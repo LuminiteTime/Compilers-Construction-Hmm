@@ -7,6 +7,8 @@ extern int yylex();
 extern char* yytext;
 extern int yylineno;
 extern FILE* yyin;
+extern void yy_scan_string(const char* str);
+extern void yy_delete_buffer(void* buffer);
 
 JavaLexer::JavaLexer() {
     std::cout << "JavaLexer initialized" << std::endl;
@@ -43,4 +45,9 @@ void JavaLexer::setInputFile(const char* filename) {
     if (!yyin) {
         std::cerr << "Error opening file: " << filename << std::endl;
     }
+}
+
+// Set input string for Flex lexer
+void JavaLexer::setInputString(const char* input) {
+    yy_scan_string(input);
 }

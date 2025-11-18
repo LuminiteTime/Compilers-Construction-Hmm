@@ -7,18 +7,28 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
+import compiler.codegen.CodeGenException;
+import compiler.codegen.CppASTBridge;
 import compiler.lexer.Lexer;
 import compiler.lexer.LexerException;
 import compiler.lexer.Token;
 import compiler.lexer.TokenType;
-import compiler.codegen.WasmCodeGenerator;
-import compiler.codegen.CodeGenException;
 
 public class Compiler {
 
     public static void main(String[] args) {
         if (args.length < 1 || args.length > 3) {
             System.err.println("Usage: java compiler.Compiler <source-file> [-o <output-file>]");
+            System.exit(1);
+        }
+
+        // Load the native JNI library
+        try {
+            String libPath = System.getProperty("user.dir") + "/compiler/src/main/cpp/parser/libparser.so";
+            System.load(libPath);
+            System.out.println("✓ Native library loaded successfully");
+        } catch (UnsatisfiedLinkError e) {
+            System.err.println("✗ Failed to load native library: " + e.getMessage());
             System.exit(1);
         }
 
@@ -63,11 +73,19 @@ public class Compiler {
 
             System.out.println("✓ Parsing successful!");
 
-            // Code generation
+            // Code generation using Java code generator
             System.out.println("Generating WebAssembly code...");
-            WasmCodeGenerator codeGen = new WasmCodeGenerator();
-            String wat = codeGen.generate(null);  // AST would be passed from C++ parser
-            
+            CppASTBridge cppBridge = new CppASTBridge(0, null);
+            long astPointer = cppBridge.getASTPointer();
+
+            if (astPointer == 0) {
+                System.err.println("✗ Failed to get AST pointer from C++ parser!");
+                System.exit(1);
+            }
+
+            // Use Java code generator instead of C++
+            String wat = cppBridge.generate();
+
             // Write output
             Files.writeString(Paths.get(outputFile), wat);
             System.out.println("✓ Code generation successful!");

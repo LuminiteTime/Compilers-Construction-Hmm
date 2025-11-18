@@ -359,11 +359,6 @@ public class Lexer {
     public native int getTypeJNI();
     public native int getLineJNI();
 
-    // Static initializer to load the native library
-    static {
-        System.loadLibrary("parser");
-    }
-
     private void advance() throws LexerException {
         try {
             if (currentChar == '\n') {

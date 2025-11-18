@@ -31,6 +31,7 @@ public:
 
     // For testing with Flex lexer
     void setInputFile(const char* filename);
+    void setInputString(const char* input);
 };
 
 // External functions for Bison

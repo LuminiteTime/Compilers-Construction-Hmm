@@ -1,6 +1,7 @@
 package compiler.codegen;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Main WebAssembly code generator
@@ -86,47 +87,142 @@ public class WasmCodeGenerator {
     /**
      * Emit allocation function for dynamic memory
      */
-    private void emitAllocFunction() {
+    public void emitAllocFunction() {
         watOutput.append("  (func $alloc (param $size i32) (result i32)\n");
         watOutput.append("    (local $ptr i32)\n");
-        watOutput.append("    global.get $heap_ptr\n");
+        watOutput.append("    (local $aligned_ptr i32)\n");
+        watOutput.append("    (global.get $heap_ptr)\n");
         watOutput.append("    local.set $ptr\n");
         watOutput.append("    local.get $ptr\n");
+        watOutput.append("    i32.const 3\n");
+        watOutput.append("    i32.add\n");
+        watOutput.append("    i32.const 4\n");
+        watOutput.append("    i32.const -1\n");
+        watOutput.append("    i32.xor\n");
+        watOutput.append("    i32.and\n"); // align to 4 bytes
+        watOutput.append("    local.set $aligned_ptr\n");
+        watOutput.append("    local.get $aligned_ptr\n");
         watOutput.append("    local.get $size\n");
         watOutput.append("    i32.add\n");
-        watOutput.append("    global.set $heap_ptr\n");
-        watOutput.append("    local.get $ptr\n");
+        watOutput.append("    (global.set $heap_ptr)\n");
+        watOutput.append("    local.get $aligned_ptr\n");
         watOutput.append("  )\n");
+    }
+
+    /**
+     * Emit print functions with fixed buffers
+     */
+    public void emitPrintFunctionsFixed() {
+        // Save current indent level
+        int savedIndent = indentLevel;
+        indentLevel = 0;
+
+        // Simple print_int function that only handles small numbers
+        watOutput.append("(func $print_int (param $value i32)\n");
+        watOutput.append("  local.get $value\n");
+        watOutput.append("  i32.const 48\n");
+        watOutput.append("  i32.add\n");
+        watOutput.append("  call $print_char\n");
+        watOutput.append(")\n");
+
+        // print_char function
+        watOutput.append("(func $print_char (param $char i32)\n");
+        watOutput.append("  (global.get $print_buffer)\n"); // get allocated buffer
+        watOutput.append("  local.get $char\n");
+        watOutput.append("  i32.store8\n"); // store char in buffer
+        watOutput.append("  (global.get $iovec_buffer)\n"); // iovec base address
+        watOutput.append("  (global.get $print_buffer)\n"); // data pointer
+        watOutput.append("  i32.store\n"); // store iov_base
+        watOutput.append("  (global.get $iovec_buffer)\n");
+        watOutput.append("  i32.const 4\n");
+        watOutput.append("  i32.add\n"); // iovec len address
+        watOutput.append("  i32.const 1\n"); // length = 1
+        watOutput.append("  i32.store\n"); // store iov_len
+        watOutput.append("  i32.const 1\n"); // stdout
+        watOutput.append("  (global.get $iovec_buffer)\n"); // iovecs pointer
+        watOutput.append("  i32.const 1\n"); // iovecs_len
+        watOutput.append("  i32.const 0\n"); // nwritten (ignored)
+        watOutput.append("  call $fd_write\n");
+        watOutput.append("  drop\n"); // ignore result
+        watOutput.append(")\n");
+
+        // No-op init function for fixed buffers
+        watOutput.append("(func $init_print_buffer\n");
+        watOutput.append("  ;; Buffers are pre-allocated with fixed addresses\n");
+        watOutput.append(")\n");
+
+        // Restore indent level
+        indentLevel = savedIndent;
     }
 
     /**
      * Emit print functions
      */
-    private void emitPrintFunctions() {
-        // Print integer
-        watOutput.append("  (func $print_int (param $value i32)\n");
-        watOutput.append("    ;; Convert i32 to string and print using fd_write\n");
-        watOutput.append("    ;; For now, simplified implementation\n");
-        watOutput.append("    local.get $value\n");
-        watOutput.append("    i32.const 0\n");
-        watOutput.append("    i32.le_s\n");
-        watOutput.append("    if\n");
-        watOutput.append("      ;; Handle negative numbers\n");
-        watOutput.append("    else\n");
-        watOutput.append("      ;; Handle positive numbers\n");
-        watOutput.append("    end\n");
-        watOutput.append("  )\n");
+    public void emitPrintFunctions() {
+        // Save current indent level
+        int savedIndent = indentLevel;
+        indentLevel = 0;
 
-        // Print real
-        watOutput.append("  (func $print_real (param $value f64)\n");
-        watOutput.append("    ;; Convert f64 to string and print\n");
-        watOutput.append("  )\n");
+        // Simple print_int function that only handles small numbers
+        watOutput.append("(func $print_int (param $value i32)\n");
+        watOutput.append("  local.get $value\n");
+        watOutput.append("  i32.const 48\n");
+        watOutput.append("  i32.add\n");
+        watOutput.append("  call $print_char\n");
+        watOutput.append(")\n");
+
+        // print_char function
+        watOutput.append("(func $print_char (param $char i32)\n");
+        watOutput.append("  (global.get $print_buffer)\n"); // get allocated buffer
+        watOutput.append("  local.get $char\n");
+        watOutput.append("  i32.store8\n"); // store char in buffer
+        watOutput.append("  (global.get $iovec_buffer)\n"); // iovec base address
+        watOutput.append("  (global.get $print_buffer)\n"); // data pointer
+        watOutput.append("  i32.store\n"); // store iov_base
+        watOutput.append("  (global.get $iovec_buffer)\n");
+        watOutput.append("  i32.const 4\n");
+        watOutput.append("  i32.add\n"); // iovec len address
+        watOutput.append("  i32.const 1\n"); // length = 1
+        watOutput.append("  i32.store\n"); // store iov_len
+        watOutput.append("  i32.const 1\n"); // stdout
+        watOutput.append("  (global.get $iovec_buffer)\n"); // iovecs pointer
+        watOutput.append("  i32.const 1\n"); // iovecs_len
+        watOutput.append("  i32.const 0\n"); // nwritten (ignored)
+        watOutput.append("  call $fd_write\n");
+        watOutput.append("  drop\n"); // ignore result
+        watOutput.append(")\n");
+
+        // Print buffer globals
+        watOutput.append("(global $print_buffer (mut i32) (i32.const 0))\n");
+        watOutput.append("(global $print_buffer_size (mut i32) (i32.const 32))\n");
+        watOutput.append("(global $iovec_buffer (mut i32) (i32.const 0))\n");
+
+        // Init print buffer function
+        watOutput.append("(func $init_print_buffer\n");
+        watOutput.append("  (global.get $print_buffer)\n");
+        watOutput.append("  i32.eqz\n");
+        watOutput.append("  if\n");
+        watOutput.append("    (global.get $print_buffer_size)\n");
+        watOutput.append("    call $alloc\n");
+        watOutput.append("    (global.set $print_buffer)\n");
+        watOutput.append("  end\n");
+        watOutput.append("  (global.get $iovec_buffer)\n");
+        watOutput.append("  i32.eqz\n");
+        watOutput.append("  if\n");
+        watOutput.append("    i32.const 8\n"); // space for iovec
+        watOutput.append("    call $alloc\n");
+        watOutput.append("    (global.set $iovec_buffer)\n");
+        watOutput.append("  end\n");
+        watOutput.append(")\n");
+
+        // Restore indent level
+        indentLevel = savedIndent;
     }
 
     /**
      * Helper: emit line with indentation
      */
-    private void emit(String code) {
+    public void emit(String code) {
         for (int i = 0; i < indentLevel; i++) {
             watOutput.append("  ");
         }
@@ -369,5 +465,57 @@ public class WasmCodeGenerator {
     public void emitBranchIf(String label) {
         emit("br_if $" + label);
     }
+
+    /**
+     * Emit WASI imports
+     */
+    public void emitWasiImports() {
+        // Only add if not already added
+        String fdWrite = "(import \"wasi_snapshot_preview1\" \"fd_write\"\n" +
+                "  (func $fd_write (param i32 i32 i32 i32) (result i32)))";
+        String procExit = "(import \"wasi_snapshot_preview1\" \"proc_exit\"\n" +
+                "  (func $proc_exit (param i32)))";
+
+        if (!imports.contains(fdWrite)) {
+            imports.add(fdWrite);
+        }
+        if (!imports.contains(procExit)) {
+            imports.add(procExit);
+        }
+    }
+
+    /**
+     * Emit memory declaration
+     */
+    public void emitMemory() {
+        emit("(memory 1)");
+        emit("(export \"memory\" (memory 0))");
+    }
+
+    /**
+     * Emit heap pointer global
+     */
+    public void emitHeapPtr() {
+        emit("(global $heap_ptr (mut i32) (i32.const 0x1000))");
+    }
+
+    /**
+     * Emit start function
+     */
+    public void emitStartFunction() {
+        emit("(func $_start");
+        emit("  call $init_print_buffer");
+        emit("  ;; Program statements will be emitted here");
+        emit(")");
+        emit("(export \"_start\" (func $_start))");
+    }
+
+    /**
+     * Get the generated WAT output
+     */
+    public String getOutput() {
+        return watOutput.toString();
+    }
+
 }
 

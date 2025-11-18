@@ -1,12 +1,15 @@
 /*
- * JNI Bridge for code generation
- * Bridges Java code generator with C++ AST
+ * JNI Bridge for AST access
+ * Provides access to C++ parsed AST for Java code generator
  */
 
 #include <jni.h>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
+#include <unordered_map>
+#include <unordered_set>
 #include "ast.h"
 #include "symbol.h"
 #include "analyzer.h"
@@ -16,181 +19,106 @@ extern ProgramNode* astRoot;
 extern SymbolTable* symbolTable;
 
 /**
- * Simple WAT emitter for code generation
+ * Convert AST node to JSON representation
  */
-class WatEmitter {
-private:
-    std::stringstream output;
-    int indentLevel = 0;
-    static const std::string INDENT;
-
-public:
-    void startModule() {
-        emit("(module");
-        indentLevel++;
-    }
-
-    void endModule() {
-        indentLevel--;
-        emit(")");
-    }
-
-    void emitMemory(int pages) {
-        emit("(memory " + std::to_string(pages) + ")");
-    }
-
-    void emitExport(const std::string& name, const std::string& kind, const std::string& item) {
-        emit("(export \"" + name + "\" (" + kind + " $" + item + "))");
-    }
-
-    void emitGlobalHeapPtr() {
-        emit("(global $heap_ptr (mut i32) (i32.const 0x1000))");
-    }
-
-    void emitComment(const std::string& text) {
-        emit(";; " + text);
-    }
-
-    std::string toString() const {
-        return output.str();
-    }
-
-private:
-    void emit(const std::string& line) {
-        for (int i = 0; i < indentLevel; i++) {
-            output << INDENT;
+static std::string astNodeToJson(ASTNode* node, int depth = 0) {
+    if (!node) return "null";
+    
+    std::stringstream json;
+    std::string indent(depth * 2, ' ');
+    
+    if (auto* program = dynamic_cast<ProgramNode*>(node)) {
+        json << "{\n";
+        json << indent << "  \"type\": \"program\",\n";
+        json << indent << "  \"declarations\": [\n";
+        
+        for (size_t i = 0; i < program->declarations.size(); ++i) {
+            json << indent << "    " << astNodeToJson(program->declarations[i], depth + 2);
+            if (i < program->declarations.size() - 1) json << ",";
+            json << "\n";
         }
-        output << line << "\n";
-    }
-};
-
-const std::string WatEmitter::INDENT = "  ";
-
-/**
- * Convert AST type to WASM type string
- */
-static std::string getWasmType(TypeNode* type) {
-    if (!type) return "i32";
-
-    if (auto* prim = dynamic_cast<PrimitiveTypeNode*>(type)) {
-        switch (prim->kind) {
-            case TypeKind::INTEGER: return "i32";
-            case TypeKind::REAL: return "f64";
-            case TypeKind::BOOLEAN: return "i32";  // 0 = false, 1 = true
+        
+        json << indent << "  ],\n";
+        json << indent << "  \"statements\": [\n";
+        
+        for (size_t i = 0; i < program->statements.size(); ++i) {
+            json << indent << "    " << astNodeToJson(program->statements[i], depth + 2);
+            if (i < program->statements.size() - 1) json << ",";
+            json << "\n";
         }
-    } else if (dynamic_cast<ArrayTypeNode*>(type)) {
-        return "i32";  // pointer
-    } else if (dynamic_cast<RecordTypeNode*>(type)) {
-        return "i32";  // pointer
-    }
+        
+        json << indent << "  ]\n";
+        json << indent << "}";
+        
+    } else if (auto* varDecl = dynamic_cast<VariableDeclarationNode*>(node)) {
+        json << "{\"type\": \"variable\", \"name\": \"" << varDecl->name << "\"";
+        json << ", \"varType\": \"integer\"";  // Simplified
+        json << "}";
 
-    return "i32";
+    } else if (auto* assign = dynamic_cast<AssignmentNode*>(node)) {
+        json << "{\"type\": \"assignment\", \"target\": ";
+        json << astNodeToJson(assign->target, depth + 1);
+        json << ", \"value\": ";
+        json << astNodeToJson(assign->value, depth + 1);
+        json << "}";
+
+    } else if (auto* print = dynamic_cast<PrintStatementNode*>(node)) {
+        json << "{\"type\": \"print\", \"expressions\": ";
+        json << astNodeToJson(print->expressions, depth + 1);
+        json << "}";
+
+    } else if (auto* exprList = dynamic_cast<ExpressionListNode*>(node)) {
+        json << "[";
+        for (size_t i = 0; i < exprList->expressions.size(); ++i) {
+            json << astNodeToJson(exprList->expressions[i], depth + 1);
+            if (i < exprList->expressions.size() - 1) json << ", ";
+        }
+        json << "]";
+
+    } else if (auto* varAccess = dynamic_cast<VariableAccessNode*>(node)) {
+        json << "{\"type\": \"variable_access\", \"name\": \"" << varAccess->name << "\"}";
+
+    } else if (auto* intLit = dynamic_cast<IntegerLiteralNode*>(node)) {
+        json << "{\"type\": \"integer_literal\", \"value\": " << intLit->value << "}";
+
+    } else if (auto* realLit = dynamic_cast<RealLiteralNode*>(node)) {
+        json << "{\"type\": \"real_literal\", \"value\": " << realLit->value << "}";
+
+    } else {
+        json << "{\"type\": \"unknown\"}";
+    }
+    
+    return json.str();
 }
 
 /**
- * Traverse AST and emit basic WASM structure
+ * Java_compiler_codegen_CppASTBridge_getASTPointer
+ *
+ * Returns pointer to the parsed AST
  */
-static void generateWasmFromAST(ProgramNode* root, WatEmitter& emitter) {
-    if (!root) {
-        emitter.emitComment("Empty program");
-        return;
-    }
-
-    emitter.emitComment("Program with " + std::to_string(root->declarations.size()) + " declarations");
-
-    // Process declarations (simplified - full implementation would traverse all nodes)
-    for (auto* decl : root->declarations) {
-        if (auto* varDecl = dynamic_cast<VariableDeclarationNode*>(decl)) {
-            emitter.emitComment("Variable: " + varDecl->name + " : " + 
-                              (varDecl->type ? "type" : "inferred"));
-        } else if (auto* typeDecl = dynamic_cast<TypeDeclarationNode*>(decl)) {
-            emitter.emitComment("Type declaration: " + typeDecl->name);
-        } else if (auto* routineDecl = dynamic_cast<RoutineDeclarationNode*>(decl)) {
-            if (auto* header = dynamic_cast<RoutineHeaderNode*>(routineDecl->header)) {
-                emitter.emitComment("Routine: " + header->name);
-            }
-        }
-    }
-}
-
-/**
- * Java_compiler_codegen_CppASTBridge_generateWasmFromAST
- * 
- * Generates WASM code from C++ AST
- */
-JNIEXPORT jstring JNICALL Java_compiler_codegen_CppASTBridge_generateWasmFromAST
-  (JNIEnv *env, jobject obj, jlong astPointer) {
-    try {
-        if (!astRoot) {
-            return env->NewStringUTF(
-                "(module\n"
-                "  (memory 1)\n"
-                "  (export \"memory\" (memory 0))\n"
-                "  (global $heap_ptr (mut i32) (i32.const 0x1000))\n"
-                ")\n"
-            );
-        }
-
-        WatEmitter emitter;
-        emitter.startModule();
-        emitter.emitMemory(1);
-        emitter.emitExport("memory", "memory", "0");
-        emitter.emitGlobalHeapPtr();
-        
-        // Generate from AST
-        generateWasmFromAST(astRoot, emitter);
-        
-        emitter.endModule();
-
-        std::string result = emitter.toString();
-        return env->NewStringUTF(result.c_str());
-    } catch (const std::exception& e) {
-        std::string errorMsg = std::string("Code generation error: ") + e.what();
-        env->ThrowNew(
-            env->FindClass("compiler/codegen/CodeGenException"),
-            errorMsg.c_str()
-        );
-        return env->NewStringUTF("");
-    }
+extern "C" JNIEXPORT jlong JNICALL Java_compiler_codegen_CppASTBridge_getASTPointer
+  (JNIEnv *env, jobject obj) {
+    std::cout << "DEBUG: getASTPointer called, astRoot=" << (void*)astRoot << std::endl;
+    return reinterpret_cast<jlong>(astRoot);
 }
 
 /**
  * Java_compiler_codegen_CppASTBridge_getASTAsJson
- * 
- * Returns AST structure as JSON for debugging
+ *
+ * Returns AST structure as JSON for Java code generator
  */
-JNIEXPORT jstring JNICALL Java_compiler_codegen_CppASTBridge_getASTAsJson
+extern "C" JNIEXPORT jstring JNICALL Java_compiler_codegen_CppASTBridge_getASTAsJson
   (JNIEnv *env, jobject obj, jlong astPointer) {
     try {
         if (!astRoot) {
-            return env->NewStringUTF("{\"declarations\": []}");
+            return env->NewStringUTF("{\"type\": \"program\", \"declarations\": [], \"statements\": []}");
         }
 
-        std::stringstream json;
-        json << "{\"declarations\": [";
-        
-        bool first = true;
-        for (auto* decl : astRoot->declarations) {
-            if (!first) json << ", ";
-            first = false;
-            
-            if (auto* varDecl = dynamic_cast<VariableDeclarationNode*>(decl)) {
-                json << "{\"type\": \"variable\", \"name\": \"" << varDecl->name << "\"}";
-            } else if (auto* typeDecl = dynamic_cast<TypeDeclarationNode*>(decl)) {
-                json << "{\"type\": \"type\", \"name\": \"" << typeDecl->name << "\"}";
-            } else if (auto* routineDecl = dynamic_cast<RoutineDeclarationNode*>(decl)) {
-                if (auto* header = dynamic_cast<RoutineHeaderNode*>(routineDecl->header)) {
-                    json << "{\"type\": \"routine\", \"name\": \"" << header->name << "\"}";
-                }
-            }
-        }
-        
-        json << "]}";
-        
-        std::string result = json.str();
-        return env->NewStringUTF(result.c_str());
+        std::string json = astNodeToJson(astRoot);
+        return env->NewStringUTF(json.c_str());
+
     } catch (const std::exception& e) {
-        return env->NewStringUTF("{\"error\": \"Failed to get AST as JSON\"}");
+        std::cerr << "Error generating AST JSON: " << e.what() << std::endl;
+        return env->NewStringUTF("{\"type\": \"program\", \"declarations\": [], \"statements\": []}");
     }
 }
-

@@ -1,6 +1,8 @@
 #include <jni.h>
 #include <iostream>
 #include "lexer.h"
+#include "ast.h"
+#include "parser.tab.h"
 
 // Global lexer instance for JNI
 static JavaLexer* globalLexer = nullptr;
@@ -19,8 +21,32 @@ extern "C" JNIEXPORT void JNICALL Java_compiler_lexer_Lexer_initializeParser
 extern "C" JNIEXPORT jboolean JNICALL Java_compiler_lexer_Lexer_parseInput
   (JNIEnv *env, jobject obj, jstring input) {
     std::cout << "JNI: Parsing input" << std::endl;
-    // For now, just return true - full implementation would parse the string
-    return JNI_TRUE;
+
+    // Convert Java string to C++ string
+    const char* inputChars = env->GetStringUTFChars(input, nullptr);
+    if (!inputChars) {
+        std::cerr << "Failed to convert Java string" << std::endl;
+        return JNI_FALSE;
+    }
+
+    // Set input for the lexer
+    if (globalLexer) {
+        globalLexer->setInputString(inputChars);
+    }
+
+    // Release the Java string
+    env->ReleaseStringUTFChars(input, inputChars);
+
+    // Parse using yyparse
+    int parseResult = yyparse();
+
+    if (parseResult == 0) {
+        std::cout << "✓ yyparse successful, AST root created" << std::endl;
+        return JNI_TRUE;
+    } else {
+        std::cout << "✗ yyparse failed with code: " << parseResult << std::endl;
+        return JNI_FALSE;
+    }
 }
 
 // JNI function to get next token (for testing)

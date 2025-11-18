@@ -44,6 +44,12 @@ public:
     ~RecordTypeNode() { delete body; }
 };
 
+class TypeNameNode : public TypeNode {
+public:
+    std::string name;
+    TypeNameNode(const std::string& n) : name(n) {}
+};
+
 class RecordBodyNode : public ASTNode {
 public:
     std::vector<ASTNode*> fields; // VariableDeclarationNode*

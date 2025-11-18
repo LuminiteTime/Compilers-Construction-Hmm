@@ -119,23 +119,6 @@ bool isBooleanType(ExpressionNode* expr) {
     return isBooleanType(expr->type);
 }
 
-bool checkArguments(RoutineInfo* routine, ASTNode* arguments) {
-    if (!arguments) return routine->paramTypes.empty();
-
-    // Try ArgumentListNode first
-    ArgumentListNode* argList = dynamic_cast<ArgumentListNode*>(arguments);
-    if (argList) {
-        return argList->arguments.size() == routine->paramTypes.size();
-    }
-
-    // Try ExpressionListNode
-    ExpressionListNode* exprList = dynamic_cast<ExpressionListNode*>(arguments);
-    if (exprList) {
-        return exprList->expressions.size() == routine->paramTypes.size();
-    }
-
-    return false;
-}
 
 void declareParameters(ASTNode* params) {
     if (!params) return;

@@ -35,20 +35,26 @@ public class EndToEndTest {
             String filename = new File(filePath).getName();
             System.out.print("Testing " + filename + "... ");
 
-            // Read source code
-            String sourceCode = Files.readString(Paths.get(filePath));
+            // Create temporary output file
+            String outputFile = "/tmp/test_" + filename.replace(".i", ".wat");
 
-            // Try to compile (would integrate with parser when ready)
-            // For now, just verify file can be read and processed
-            if (sourceCode == null || sourceCode.isEmpty()) {
-                System.out.println("❌ FAILED (empty file)");
+            // Run the compiler
+            Compiler.main(new String[]{filePath, "-o", outputFile});
+
+            // Check if output file was created and is not empty
+            java.io.File output = new java.io.File(outputFile);
+            if (output.exists() && output.length() > 0) {
+                System.out.println("✓ PASSED");
+                passed++;
+
+                // Clean up
+                output.delete();
+                return true;
+            } else {
+                System.out.println("❌ FAILED (no output generated)");
                 failed++;
                 return false;
             }
-
-            System.out.println("✓ PASSED");
-            passed++;
-            return true;
 
         } catch (Exception e) {
             System.out.println("❌ FAILED (" + e.getMessage() + ")");
@@ -89,6 +95,16 @@ public class EndToEndTest {
      * Main test runner
      */
     public static void main(String[] args) {
+        // Load the native JNI library
+        try {
+            String libPath = System.getProperty("user.dir") + "/compiler/src/main/cpp/parser/libparser.so";
+            System.load(libPath);
+            System.out.println("✓ Native library loaded successfully");
+        } catch (UnsatisfiedLinkError e) {
+            System.err.println("✗ Failed to load native library: " + e.getMessage());
+            System.exit(1);
+        }
+
         EndToEndTest tester = new EndToEndTest();
 
         // Parser test cases - basics
