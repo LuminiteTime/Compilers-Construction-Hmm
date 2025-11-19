@@ -1,10 +1,10 @@
 ## **ПОЛНОЕ ДЕТАЛЬНОЕ ОПИСАНИЕ ВСЕХ ФАЙЛОВ ПРОЕКТА КОМПИЛЯТОРА**
 
-### **🔧 ОСНОВНЫЕ КОМПОНЕНТЫ КОМПИЛЯТОРА**
+### **🔧 ОСНОВНЫЕ КОМПОНЕНТЫ КОМПИЛЯТОРА** 
 
----
+ТЕСТИРОВАНИЕ - **./test_compiler.sh test**
 
-## **📁 КОРНЕВЫЕ ФАЙЛЫ ПРОЕКТА**
+##  **КОРНЕВЫЕ ФАЙЛЫ ПРОЕКТА**
 
 ### **`README.md`** - Основная документация проекта
 
@@ -408,7 +408,7 @@ public class MemoryLayout {
         public String recordName;
         public int totalSize;
         public Map<String, Integer> fieldOffsets = new LinkedHashMap<>();
-      
+    
         public void addField(String fieldName, String fieldType) {
             // Добавление поля записи
         }
@@ -845,25 +845,25 @@ static std::string astNodeToJson(ASTNode* node, int depth = 0) {
         json << "{\n";
         json << indent << "  \"type\": \"program\",\n";
         json << indent << "  \"declarations\": [\n";
-      
+    
         for (size_t i = 0; i < program->declarations.size(); ++i) {
             json << indent << "    " << astNodeToJson(program->declarations[i], depth + 2);
             if (i < program->declarations.size() - 1) json << ",";
             json << "\n";
         }
-      
+    
         json << indent << "  ],\n";
         json << indent << "  \"statements\": [\n";
-      
+    
         for (size_t i = 0; i < program->statements.size(); ++i) {
             json << indent << "    " << astNodeToJson(program->statements[i], depth + 2);
             if (i < program->statements.size() - 1) json << ",";
             json << "\n";
         }
-      
+    
         json << indent << "  ]\n";
         json << indent << "}\n";
-      
+    
     } else if (auto* varDecl = dynamic_cast<VariableDeclarationNode*>(node)) {
         json << "{\"type\": \"variable\", \"name\": \"" << varDecl->name << "\"";
         json << ", \"varType\": \"integer\"";  // Упрощенно
@@ -1093,7 +1093,7 @@ public class TestAllCases {
         String name;
         String type;
         int offset;
-      
+    
         VariableInfo(String name, String type, int offset) {
             this.name = name;
             this.type = type;

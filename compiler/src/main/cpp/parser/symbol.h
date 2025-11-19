@@ -45,8 +45,25 @@ public:
         variableScopes.emplace_back(); // global scope
     }
 
+    ~SymbolTable() {
+        // Clean up variable info
+        for (auto& scope : variableScopes) {
+            for (auto& pair : scope) {
+                delete pair.second;
+            }
+        }
+        // Clean up type info
+        for (auto& pair : types) {
+            delete pair.second;
+        }
+        // Clean up routine info
+        for (auto& pair : routines) {
+            delete pair.second;
+        }
+    }
+
     void enterScope() {
-        variableScopes.emplace_back();
+        variableScopes.emplace_back(); // new scope
     }
 
     void exitScope() {
@@ -84,14 +101,29 @@ public:
     }
 
     void declareRoutine(ASTNode* headerNode) {
-        // Assuming RoutineHeaderNode
-        RoutineHeaderNode* header = static_cast<RoutineHeaderNode*>(headerNode);
+        if (!headerNode) return;
+
+        // Safe cast with type checking
+        RoutineHeaderNode* header = dynamic_cast<RoutineHeaderNode*>(headerNode);
+        if (!header) return; // Invalid header node
+
         std::vector<TypeNode*> paramTypes;
-        ParameterListNode* params = static_cast<ParameterListNode*>(header->parameters);
-        for (auto param : params->parameters) {
-            ParameterDeclarationNode* p = static_cast<ParameterDeclarationNode*>(param);
-            paramTypes.push_back(p->type);
+
+        // Safe parameter processing
+        if (header->parameters) {
+            ParameterListNode* params = dynamic_cast<ParameterListNode*>(header->parameters);
+            if (params) {
+                for (auto param : params->parameters) {
+                    if (param) {
+                        ParameterDeclarationNode* p = dynamic_cast<ParameterDeclarationNode*>(param);
+                        if (p && p->type) {
+                            paramTypes.push_back(p->type);
+                        }
+                    }
+                }
+            }
         }
+
         RoutineInfo* info = new RoutineInfo(header->name, paramTypes, header->returnType);
         routines[header->name] = info;
     }

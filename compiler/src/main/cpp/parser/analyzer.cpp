@@ -21,7 +21,20 @@ Analyzer::Result Analyzer::analyze(ProgramNode* root) {
         result.errors.push_back("Analyzer: null program root");
         return result;
     }
+
+    // Create fresh symbol table for analysis
+    SymbolTable* analysisTable = new SymbolTable();
+
+    // Temporarily replace global symbol table
+    SymbolTable* oldTable = symbolTable;
+    symbolTable = analysisTable;
+
     runChecks(root);
+
+    // Restore original symbol table
+    symbolTable = oldTable;
+    delete analysisTable;
+
     if (enableOpts && result.errors.empty()) {
         runOptimizations(root);
         struct {
@@ -87,7 +100,10 @@ void Analyzer::runChecks(ProgramNode* root) {
 
 void Analyzer::checkNode(ASTNode* node) {
     if (!node) return;
+
+    // Add declarations to symbol table
     if (auto* vd = dynamic_cast<VariableDeclarationNode*>(node)) {
+        symbolTable->declareVariable(vd->name, vd->type);
         if (vd->initializer) {
             checkExpression(vd->initializer);
             if (vd->type) {
@@ -98,6 +114,7 @@ void Analyzer::checkNode(ASTNode* node) {
             }
         }
     } else if (auto* td = dynamic_cast<TypeDeclarationNode*>(node)) {
+        symbolTable->declareType(td->name, td->type);
         if (auto* rec = dynamic_cast<RecordTypeNode*>(td->type)) {
             if (auto* body = dynamic_cast<RecordBodyNode*>(rec->body)) {
                 std::unordered_set<std::string> seen;
@@ -111,6 +128,9 @@ void Analyzer::checkNode(ASTNode* node) {
             }
         }
     } else if (auto* rd = dynamic_cast<RoutineDeclarationNode*>(node)) {
+        if (auto* header = static_cast<RoutineHeaderNode*>(rd->header)) {
+            symbolTable->declareRoutine(header);
+        }
         if (auto* body = dynamic_cast<RoutineBodyNode*>(rd->body)) {
             if (auto* expr = dynamic_cast<ExpressionNode*>(body->body)) {
                 auto* header = static_cast<RoutineHeaderNode*>(rd->header);
@@ -121,8 +141,10 @@ void Analyzer::checkNode(ASTNode* node) {
                     }
                 }
             } else if (auto* b = dynamic_cast<BodyNode*>(body->body)) {
+                symbolTable->enterScope();
                 for (auto* d : b->declarations) checkNode(d);
                 for (auto* s : b->statements) checkStatement(s);
+                symbolTable->exitScope();
             }
         }
     }
@@ -142,8 +164,10 @@ void Analyzer::checkStatement(StatementNode* stmt) {
             result.errors.push_back("While condition must be boolean");
         }
         if (auto* b = dynamic_cast<BodyNode*>(wh->body)) {
+            symbolTable->enterScope();
             for (auto* d : b->declarations) checkNode(d);
             for (auto* s : b->statements) checkStatement(s);
+            symbolTable->exitScope();
         }
     } else if (auto* fr = dynamic_cast<ForLoopNode*>(stmt)) {
         if (auto* r = dynamic_cast<RangeNode*>(fr->range)) {
@@ -161,8 +185,10 @@ void Analyzer::checkStatement(StatementNode* stmt) {
             }
         }
         if (auto* b = dynamic_cast<BodyNode*>(fr->body)) {
+            symbolTable->enterScope();
             for (auto* d : b->declarations) checkNode(d);
             for (auto* s : b->statements) checkStatement(s);
+            symbolTable->exitScope();
         }
     } else if (auto* iff = dynamic_cast<IfStatementNode*>(stmt)) {
         checkExpression(iff->condition);
@@ -170,12 +196,16 @@ void Analyzer::checkStatement(StatementNode* stmt) {
             result.errors.push_back("If condition must be boolean");
         }
         if (auto* tb = dynamic_cast<BodyNode*>(iff->thenBody)) {
+            symbolTable->enterScope();
             for (auto* d : tb->declarations) checkNode(d);
             for (auto* s : tb->statements) checkStatement(s);
+            symbolTable->exitScope();
         }
         if (auto* eb = dynamic_cast<BodyNode*>(iff->elseBody)) {
+            symbolTable->enterScope();
             for (auto* d : eb->declarations) checkNode(d);
             for (auto* s : eb->statements) checkStatement(s);
+            symbolTable->exitScope();
         }
     } else if (auto* pr = dynamic_cast<PrintStatementNode*>(stmt)) {
         if (auto* el = dynamic_cast<ExpressionListNode*>(pr->expressions)) {
@@ -188,6 +218,18 @@ void Analyzer::checkStatement(StatementNode* stmt) {
 
 void Analyzer::checkExpression(ExpressionNode* expr) {
     if (!expr) return;
+
+    // Check for undefined variables
+    if (auto* va = dynamic_cast<VariableAccessNode*>(expr)) {
+        VariableInfo* var = symbolTable->lookupVariable(va->name);
+        if (!var) {
+            result.errors.push_back("Undefined variable '" + va->name + "'");
+        } else {
+            va->type = var->type; // Set type from symbol table
+        }
+        return;
+    }
+
     if (auto* bin = dynamic_cast<BinaryOpNode*>(expr)) {
         checkExpression(bin->left);
         checkExpression(bin->right);
@@ -248,7 +290,7 @@ void Analyzer::checkArrayIndex(ArrayAccessNode* arrAcc) {
 }
 
 void Analyzer::checkRoutineCallTypes(const std::string& name, ASTNode* arguments) {
-    RoutineInfo* routine = symbolTable ? symbolTable->lookupRoutine(name) : nullptr;
+    RoutineInfo* routine = symbolTable->lookupRoutine(name);
     if (!routine) {
         result.errors.push_back("Undefined routine '" + name + "'");
         return;

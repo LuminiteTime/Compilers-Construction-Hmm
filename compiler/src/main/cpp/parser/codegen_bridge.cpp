@@ -17,6 +17,7 @@
 // Global AST pointer (set by parser)
 extern ProgramNode* astRoot;
 extern SymbolTable* symbolTable;
+extern bool hasSemanticErrors;
 
 /**
  * Convert AST node to JSON representation
@@ -110,9 +111,30 @@ extern "C" JNIEXPORT jlong JNICALL Java_compiler_codegen_CppASTBridge_getASTPoin
 extern "C" JNIEXPORT jstring JNICALL Java_compiler_codegen_CppASTBridge_getASTAsJson
   (JNIEnv *env, jobject obj, jlong astPointer) {
     try {
+        // Reset semantic errors flag
+        hasSemanticErrors = false;
+
         if (!astRoot) {
             return env->NewStringUTF("{\"type\": \"program\", \"declarations\": [], \"statements\": []}");
         }
+
+        // Run analyzer on the AST
+        Analyzer analyzer(/*enableOptimizations=*/true);
+        Analyzer::Result res = analyzer.analyze(astRoot);
+
+        if (!res.errors.empty()) {
+            std::cout << "=== SEMANTIC ERRORS ===" << std::endl;
+            for (auto& e : res.errors) std::cout << "error: " << e << std::endl;
+            hasSemanticErrors = true;
+            return env->NewStringUTF("{\"type\": \"program\", \"declarations\": [], \"statements\": []}");
+        }
+
+        if (!res.warnings.empty()) {
+            std::cout << "=== SEMANTIC WARNINGS ===" << std::endl;
+            for (auto& w : res.warnings) std::cout << "warning: " << w << std::endl;
+        }
+
+        std::cout << "Optimizations applied: " << res.optimizationsApplied << std::endl;
 
         std::string json = astNodeToJson(astRoot);
         return env->NewStringUTF(json.c_str());

@@ -70,8 +70,8 @@ public class CppASTBridge {
             // Get AST as JSON from C++ and parse it
             String astJson = getASTAsJson(astPointer);
             if (astJson == null || astJson.trim().isEmpty()) {
-                // Fallback to minimal module
-                return createMinimalModule();
+                // Semantic errors occurred, abort compilation
+                throw new RuntimeException("Compilation aborted due to semantic errors");
             }
 
             // Parse JSON and generate real WASM code
@@ -87,12 +87,16 @@ public class CppASTBridge {
      */
     private String generateFromJson(String astJson, WasmCodeGenerator generator, CodeGenVisitor visitor) {
         try {
-            System.out.println("DEBUG: Processing AST JSON for code generation");
-
             // Parse JSON using simple parser (since Gson not available)
             var json = parseSimpleJson(astJson);
             if (json == null) {
                 return createMinimalWorkingModule();
+            }
+
+            // Check if this is an empty program (semantic errors)
+            var stmtList = json.get("statements");
+            if (stmtList instanceof java.util.List && ((java.util.List<?>) stmtList).isEmpty()) {
+                return createMinimalModule();
             }
 
             // Initialize generator with basic setup - start module
@@ -122,8 +126,8 @@ public class CppASTBridge {
 
             // Second pass: generate code for statements
             var statements = json.get("statements");
-            if (statements instanceof java.util.List<?> stmtList) {
-                for (var stmt : stmtList) {
+            if (statements instanceof java.util.List<?> stmtList2) {
+                for (var stmt : stmtList2) {
                     if (stmt instanceof java.util.Map<?,?> stmtMap) {
                         processStatementFromMap(stmtMap, generator);
                     }

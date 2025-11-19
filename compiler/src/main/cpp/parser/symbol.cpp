@@ -121,10 +121,16 @@ bool isBooleanType(ExpressionNode* expr) {
 
 
 void declareParameters(ASTNode* params) {
-    if (!params) return;
-    ParameterListNode* paramList = static_cast<ParameterListNode*>(params);
+    if (!params || !symbolTable) return;
+
+    ParameterListNode* paramList = dynamic_cast<ParameterListNode*>(params);
+    if (!paramList) return; // Invalid parameter list
+
     for (auto param : paramList->parameters) {
-        ParameterDeclarationNode* p = static_cast<ParameterDeclarationNode*>(param);
-        symbolTable->declareVariable(p->name, p->type);
+        if (!param) continue;
+        ParameterDeclarationNode* p = dynamic_cast<ParameterDeclarationNode*>(param);
+        if (p && p->type) {
+            symbolTable->declareVariable(p->name, p->type);
+        }
     }
 }

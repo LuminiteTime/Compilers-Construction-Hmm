@@ -86,6 +86,12 @@ public class Compiler {
             // Use Java code generator instead of C++
             String wat = cppBridge.generate();
 
+            // Check if semantic errors occurred (minimal module returned)
+            if (wat.contains("(func $_start") && wat.contains("call $proc_exit")) {
+                System.err.println("✗ Compilation failed due to semantic errors!");
+                System.exit(1);
+            }
+
             // Write output
             Files.writeString(Paths.get(outputFile), wat);
             System.out.println("✓ Code generation successful!");
