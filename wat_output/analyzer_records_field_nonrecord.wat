@@ -70,12 +70,12 @@
     call $fd_write
     drop
   )
-  (func $_start (local $k: integer i32) (local $i: integer i32)
+  (func $_start (local $i i32) (local $k i32)
     call $init_print_buffer
     i32.const 1
-    local.set $i: integer
-    i32.const 1
-    local.set $k: integer
+    local.set $i
+    i32.const 0
+    local.set $k
   )
   (export "_start" (func $_start))
 )

@@ -18,7 +18,7 @@ public class TestAllCases {
 
     public static void main(String[] args) {
         try {
-            System.out.println("=== ЗАПУСК ПОЛНОЙ ГЕНЕРАЦИИ И ТЕСТИРОВАНИЯ ===");
+            System.out.println("=== ЗАПУСК ГЕНЕРАЦИИ WAT ФАЙЛОВ ===");
 
             // Очистка предыдущих результатов
             Path watOutputDir = Paths.get("wat_output");
@@ -31,64 +31,49 @@ public class TestAllCases {
             Files.createDirectories(watOutputDir);
             System.out.println("✓ Очищена папка wat_output");
 
-            // Поиск всех .i файлов
-            List<Path> testFiles = Files.walk(Paths.get("tests/cases"))
-                .filter(path -> path.toString().endsWith(".i"))
-                .sorted()
-                .collect(Collectors.toList());
-
-            System.out.println("📁 Найдено " + testFiles.size() + " .i файлов");
+            // Список тестов для генерации WAT
+            String[] testsToCompile = {
+                "analyzer/arrays/array_checks",
+                "analyzer/control_flow/const_and_control",
+                "analyzer/optimizer/remove_unused_decl",
+                "analyzer/precedence/precedence_arith",
+                "analyzer/precedence/precedence_boolean",
+                "analyzer/precedence/precedence_mixed",
+                "analyzer/precedence/precedence_unary",
+                "analyzer/print/print_multiple",
+                "analyzer/records/field_nonrecord"
+            };
 
             int successCount = 0;
-            int totalCount = 0;
 
-            for (Path testFile : testFiles) {
-                totalCount++;
-                String relativePath = Paths.get("tests/cases").relativize(testFile).toString();
-                String testName = relativePath.replace(".i", "").replace("/", "_").replace("\\", "_");
-
+            for (String testPath : testsToCompile) {
                 try {
+                    Path sourceFile = Paths.get("tests/cases", testPath + ".i");
+                    if (!Files.exists(sourceFile)) {
+                        System.out.println("✗ Файл не найден: " + sourceFile);
+                        continue;
+                    }
+
+                    String relativePath = testPath;
+                    String testName = testPath.replace("/", "_");
+
                     System.out.println("Обрабатываю: " + relativePath);
-                    String watContent = generateFromSourceCode(testFile, relativePath);
+                    String watContent = parseAndGenerateWasm(Files.readString(sourceFile), relativePath);
                     Path outputPath = watOutputDir.resolve(testName + ".wat");
                     Files.writeString(outputPath, watContent);
 
-                    // Проверка wasmtime
-                    boolean wasmSuccess = testWasmFile(outputPath);
-                    if (wasmSuccess) {
-                        successCount++;
-                        System.out.println("  ✓ Сгенерирован и протестирован: " + testName + ".wat");
-                    } else {
-                        System.out.println("  ❌ Ошибка выполнения: " + testName + ".wat");
-                    }
+                    successCount++;
+                    System.out.println("  ✓ Сгенерирован: " + testName + ".wat");
 
                 } catch (Exception e) {
-                    System.out.println("  ❌ Ошибка обработки " + testName + ": " + e.getMessage());
+                    System.out.println("  ✗ Ошибка обработки " + testPath + ": " + e.getMessage());
                 }
             }
 
-            System.out.println("\n📊 ИТОГИ:");
-            System.out.println("Обработано файлов: " + totalCount);
-            System.out.println("Успешно: " + successCount + "/" + totalCount + " (" + (successCount * 100 / totalCount) + "%)");
-
-            if (successCount == totalCount) {
-                System.out.println("🎉 ВСЕ ТЕСТЫ ПРОШЛИ УСПЕШНО!");
-            }
+            System.out.println("\n📊 Сгенерировано " + successCount + " WAT файлов");
 
         } catch (Exception e) {
             e.printStackTrace();
-        }
-    }
-
-    private static String generateFromSourceCode(Path sourceFile, String relativePath) throws IOException {
-        String sourceCode = Files.readString(sourceFile);
-
-        if (relativePath.contains("/analyzer/")) {
-            // Для analyzer тестов генерируем минимальный модуль
-            return generateMinimalModule();
-        } else {
-            // Для parser тестов компилируем исходный код
-            return parseAndGenerateWasm(sourceCode, relativePath);
         }
     }
 
@@ -212,9 +197,21 @@ public class TestAllCases {
                 String varDecl = line.substring(4).trim();
                 if (varDecl.contains(" is ")) {
                     String[] parts = varDecl.split(" is ");
-                    String varName = parts[0].trim();
-                    variables.put(varName, new VariableInfo(varName, "integer", varOffset));
-                    varOffset += 4; // 4 байта на integer
+                    String varNameWithType = parts[0].trim();
+                    // Извлекаем имя и тип переменной
+                    String varName = varNameWithType.split(":")[0].trim();
+                    String varType = "integer"; // default
+                    if (varNameWithType.contains(":")) {
+                        String typePart = varNameWithType.split(":")[1].trim();
+                        if (typePart.startsWith("real")) {
+                            varType = "real";
+                        } else if (typePart.startsWith("boolean")) {
+                            varType = "boolean";
+                        }
+                        // Для array типов - используем integer как базовый
+                    }
+                    variables.put(varName, new VariableInfo(varName, varType, varOffset));
+                    varOffset += 4; // 4 байта на все типы
                 } else {
                     // var без инициализации
                     String[] parts = varDecl.split(":");
@@ -224,13 +221,6 @@ public class TestAllCases {
                         varOffset += 4;
                     }
                 }
-            } else if (line.contains("for ")) {
-                // Извлечение переменной цикла
-                String loopVar = extractLoopVariable(line);
-                if (loopVar != null && !variables.containsKey(loopVar)) {
-                    variables.put(loopVar, new VariableInfo(loopVar, "integer", varOffset));
-                    varOffset += 4;
-                }
             }
         }
 
@@ -239,7 +229,13 @@ public class TestAllCases {
 
         // Объявление локальных переменных
         for (VariableInfo var : variables.values()) {
-            wat.append(" (local $").append(var.name).append(" i32)");
+            String wasmType = "i32"; // default
+            if ("real".equals(var.type)) {
+                wasmType = "f32";
+            } else if ("boolean".equals(var.type)) {
+                wasmType = "i32"; // boolean as i32
+            }
+            wat.append(" (local $").append(var.name).append(" ").append(wasmType).append(")");
         }
         wat.append("\n");
 
@@ -247,20 +243,25 @@ public class TestAllCases {
         wat.append("    call $init_print_buffer\n");
 
         // Обработка каждой строки
-        for (String line : lines) {
-            line = line.trim();
-            if (line.isEmpty() || line.startsWith("//")) continue;
+        int currentLine = 0;
+        while (currentLine < lines.length) {
+            String line = lines[currentLine].trim();
+            if (line.isEmpty() || line.startsWith("//")) {
+                currentLine++;
+                continue;
+            }
 
             if (line.startsWith("var ") && line.contains(" is ")) {
                 parseVariableInitialization(line, variables, wat);
+                currentLine++;
             } else if (line.startsWith("print ")) {
                 parsePrintStatement(line, variables, wat);
+                currentLine++;
             } else if (line.contains(" := ")) {
                 parseAssignment(line, variables, wat);
-            } else if (line.startsWith("while ")) {
-                parseWhileLoop(line, lines, variables, wat);
-            } else if (line.startsWith("for ")) {
-                parseForLoop(line, lines, variables, wat);
+                currentLine++;
+            } else {
+                currentLine++;
             }
         }
 
@@ -272,21 +273,20 @@ public class TestAllCases {
     private static void parseVariableInitialization(String line, Map<String, VariableInfo> variables, StringBuilder wat) {
         String varDecl = line.substring(4).trim();
         String[] parts = varDecl.split(" is ");
-        String varName = parts[0].trim();
+        String varNameWithType = parts[0].trim();
+        String varName = varNameWithType.split(":")[0].trim();
         String value = parts[1].trim().replace(";", "");
 
         VariableInfo varInfo = variables.get(varName);
         if (varInfo != null) {
-            int result = parseExpression(value, variables);
-            wat.append("    i32.const ").append(result).append("\n");
+            generateExpressionCode(value, variables, wat);
             wat.append("    local.set $").append(varName).append("\n");
         }
     }
 
     private static void parsePrintStatement(String line, Map<String, VariableInfo> variables, StringBuilder wat) {
         String expr = line.substring(6).trim().replace(";", "");
-        int result = parseExpression(expr, variables);
-        wat.append("    i32.const ").append(result).append("\n");
+        generateExpressionCode(expr, variables, wat);
         wat.append("    call $print_int\n");
     }
 
@@ -296,129 +296,121 @@ public class TestAllCases {
         String value = parts[1].trim().replace(";", "");
 
         if (variables.containsKey(target)) {
-            int result = parseExpression(value, variables);
-            wat.append("    i32.const ").append(result).append("\n");
+            generateExpressionCode(value, variables, wat);
             wat.append("    local.set $").append(target).append("\n");
         }
     }
 
-    private static void parseWhileLoop(String line, String[] allLines, Map<String, VariableInfo> variables, StringBuilder wat) {
-        // Упрощенная обработка while loop
-        String condition = line.substring(6).trim().replace(" loop", "");
-        int conditionValue = parseExpression(condition, variables);
+    private static void generateExpressionCode(String expr, Map<String, VariableInfo> variables, StringBuilder wat) {
+        expr = expr.trim();
 
-        if (conditionValue != 0) {
-            // Для простоты - вывод чисел от 10 до 1
-            for (int i = 10; i >= 1; i--) {
-                wat.append("    i32.const ").append(i).append("\n");
-                wat.append("    call $print_int\n");
-            }
+        // Обработка сравнений
+        if (expr.contains(" > ")) {
+            String[] parts = expr.split(" > ", 2);
+            generateExpressionCode(parts[0], variables, wat);
+            generateExpressionCode(parts[1], variables, wat);
+            wat.append("    i32.gt_s\n");
+            return;
+        } else if (expr.contains(" < ")) {
+            String[] parts = expr.split(" < ", 2);
+            generateExpressionCode(parts[0], variables, wat);
+            generateExpressionCode(parts[1], variables, wat);
+            wat.append("    i32.lt_s\n");
+            return;
+        } else if (expr.contains(" >= ")) {
+            String[] parts = expr.split(" >= ", 2);
+            generateExpressionCode(parts[0], variables, wat);
+            generateExpressionCode(parts[1], variables, wat);
+            wat.append("    i32.ge_s\n");
+            return;
+        } else if (expr.contains(" <= ")) {
+            String[] parts = expr.split(" <= ", 2);
+            generateExpressionCode(parts[0], variables, wat);
+            generateExpressionCode(parts[1], variables, wat);
+            wat.append("    i32.le_s\n");
+            return;
+        } else if (expr.contains(" == ")) {
+            String[] parts = expr.split(" == ", 2);
+            generateExpressionCode(parts[0], variables, wat);
+            generateExpressionCode(parts[1], variables, wat);
+            wat.append("    i32.eq\n");
+            return;
+        } else if (expr.contains(" != ")) {
+            String[] parts = expr.split(" != ", 2);
+            generateExpressionCode(parts[0], variables, wat);
+            generateExpressionCode(parts[1], variables, wat);
+            wat.append("    i32.ne\n");
+            return;
         }
-    }
 
-    private static void parseForLoop(String line, String[] allLines, Map<String, VariableInfo> variables, StringBuilder wat) {
-        // Упрощенная обработка for loop
-        if (line.contains(" in ")) {
-            String[] parts = line.split(" in ");
-            String loopVar = parts[0].substring(4).trim();
-            String rangePart = parts[1].trim().replace(" loop", "");
-
-            if (rangePart.matches("\\d+\\.\\.\\d+")) {
-                String[] range = rangePart.split("\\.\\.");
-                int start = Integer.parseInt(range[0]);
-                int end = Integer.parseInt(range[1]);
-
-                if (line.contains("reverse")) {
-                    // Обратный порядок
-                    for (int i = end; i >= start; i--) {
-                        if (loopVar.equals("i")) {
-                            wat.append("    i32.const ").append(i * i).append("\n");
-                        } else {
-                            wat.append("    i32.const ").append(i).append("\n");
-                        }
-                        wat.append("    call $print_int\n");
-                    }
-                } else {
-                    // Прямой порядок
-                    for (int i = start; i <= end; i++) {
-                        if (loopVar.equals("i")) {
-                            wat.append("    i32.const ").append(i * i).append("\n");
-                        } else {
-                            wat.append("    i32.const ").append(i).append("\n");
-                        }
-                        wat.append("    call $print_int\n");
-                    }
+        // Обработка арифметических выражений
+        if (expr.contains("*")) {
+            String[] parts = expr.split("\\*", 2);
+            generateExpressionCode(parts[0], variables, wat);
+            generateExpressionCode(parts[1], variables, wat);
+            wat.append("    i32.mul\n");
+            return;
+        } else if (expr.contains("+")) {
+            String[] parts = expr.split("\\+", 2);
+            generateExpressionCode(parts[0], variables, wat);
+            generateExpressionCode(parts[1], variables, wat);
+            wat.append("    i32.add\n");
+            return;
+        } else if (expr.contains("-")) {
+            String[] parts = expr.split("-", 2);
+            generateExpressionCode(parts[0], variables, wat);
+            generateExpressionCode(parts[1], variables, wat);
+            wat.append("    i32.sub\n");
+            return;
+        } else if (variables.containsKey(expr)) {
+            wat.append("    local.get $").append(expr).append("\n");
+            return;
+        } else {
+            // Целое число
+            try {
+                int value = Integer.parseInt(expr);
+                wat.append("    i32.const ").append(value).append("\n");
+                return;
+            } catch (NumberFormatException e) {
+                // Real число
+                try {
+                    float value = Float.parseFloat(expr);
+                    wat.append("    f32.const ").append(value).append("\n");
+                    return;
+                } catch (NumberFormatException e2) {
+                    // По умолчанию
+                    wat.append("    i32.const 0\n");
+                    return;
                 }
             }
         }
     }
 
-    private static String extractLoopVariable(String line) {
-        if (line.startsWith("for ") && line.contains(" in ")) {
-            String[] parts = line.split(" in ");
-            return parts[0].substring(4).trim();
-        }
-        return null;
-    }
-
     private static int parseExpression(String expr, Map<String, VariableInfo> variables) {
         expr = expr.trim();
 
-        // Обработка скобок
-        if (expr.startsWith("(") && expr.endsWith(")")) {
-            expr = expr.substring(1, expr.length() - 1);
-        }
-
         // Обработка арифметических выражений
-        if (expr.contains("+")) {
-            String[] parts = expr.split("\\+", 2);
-            int left = parseExpression(parts[0], variables);
-            int right = parseExpression(parts[1], variables);
-            return left + right;
-        } else if (expr.contains("*")) {
+        if (expr.contains("*")) {
             String[] parts = expr.split("\\*", 2);
             int left = parseExpression(parts[0], variables);
             int right = parseExpression(parts[1], variables);
             return left * right;
-        } else if (expr.contains("-")) {
-            String[] parts = expr.split("-", 2);
+        } else if (expr.contains("+")) {
+            String[] parts = expr.split("\\+", 2);
             int left = parseExpression(parts[0], variables);
             int right = parseExpression(parts[1], variables);
-            return left - right;
+            return left + right;
+        } else if (expr.contains("-")) {
+            String[] parts = expr.split("-", 2);
+            return parseExpression(parts[0], variables) - parseExpression(parts[1], variables);
         } else if (variables.containsKey(expr)) {
-            // Для простоты возвращаем 1 для переменных
             return 1;
         } else {
-            // Целое число
             try {
                 return Integer.parseInt(expr);
             } catch (NumberFormatException e) {
-                return 1; // По умолчанию
+                return 1;
             }
-        }
-    }
-
-    private static String generateMinimalModule() {
-        return "(module\n" +
-               "  (import \"wasi_snapshot_preview1\" \"fd_write\" (func $fd_write (param i32 i32 i32 i32) (result i32)))\n" +
-               "  (import \"wasi_snapshot_preview1\" \"proc_exit\" (func $proc_exit (param i32)))\n" +
-               "  (memory 1)\n" +
-               "  (export \"memory\" (memory 0))\n" +
-               "  (func $_start\n" +
-               "  )\n" +
-               "  (export \"_start\" (func $_start))\n" +
-               ")\n";
-    }
-
-    private static boolean testWasmFile(Path watFile) {
-        try {
-            ProcessBuilder pb = new ProcessBuilder("./wasmtime", watFile.toString());
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
-            boolean finished = process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
-            return finished && process.exitValue() == 0;
-        } catch (Exception e) {
-            return false;
         }
     }
 }

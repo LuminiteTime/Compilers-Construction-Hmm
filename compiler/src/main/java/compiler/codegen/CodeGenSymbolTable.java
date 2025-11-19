@@ -148,6 +148,13 @@ public class CodeGenSymbolTable {
     }
 
     /**
+     * Get all local variables in current scope
+     */
+    public Map<String, SymbolInfo> getLocalVariables() {
+        return new HashMap<>(scopes.peek());
+    }
+
+    /**
      * Reset for function generation
      */
     public void resetLocalIndices() {

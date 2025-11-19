@@ -7,8 +7,10 @@
   (global $print_buffer i32 (i32.const 0x1000))
   (global $iovec_buffer i32 (i32.const 0x1010))
   (global $nwritten i32 (i32.const 0x1020))
+
   (func $init_print_buffer
   )
+
   (func $alloc (param $size i32) (result i32)
     global.get $heap_ptr
     global.get $heap_ptr
@@ -16,6 +18,7 @@
     i32.add
     global.set $heap_ptr
   )
+
   (func $print_int (param $n i32)
     local.get $n
     i32.const 0
@@ -31,6 +34,7 @@
     local.get $n
     call $print_digits
   )
+
   (func $print_digits (param $n i32)
     local.get $n
     i32.const 10
@@ -53,6 +57,7 @@
       call $print_char
     end
   )
+
   (func $print_char (param $char i32)
     global.get $print_buffer
     local.get $char
@@ -70,35 +75,10 @@
     call $fd_write
     drop
   )
-  (func $_start (local $z: integer i32) (local $a: integer i32) (local $w: integer i32)
+
+  (func $_start
     call $init_print_buffer
     i32.const 8
-    local.set $a: integer
-    i32.const 13
-    local.set $z: integer
-    i32.const 10
-    call $print_int
-    i32.const 9
-    call $print_int
-    i32.const 8
-    call $print_int
-    i32.const 7
-    call $print_int
-    i32.const 6
-    call $print_int
-    i32.const 5
-    call $print_int
-    i32.const 4
-    call $print_int
-    i32.const 3
-    call $print_int
-    i32.const 2
-    call $print_int
-    i32.const 1
-    call $print_int
-    i32.const 10
-    local.set $w: integer
-    i32.const 1
     call $print_int
   )
   (export "_start" (func $_start))

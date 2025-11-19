@@ -103,14 +103,24 @@ public class CppASTBridge {
             generator.emitAllocFunction();
             generator.emitPrintFunctions();
 
-            // Use visitor to traverse AST and generate code
+            // First pass: collect local variables by visiting declarations
             visitor.visitProgram(json);
 
-            // Generate _start function for top-level statements
+            // Generate _start function with local variable declarations
             generator.emit("(func $_start");
+
+            // Emit local variable declarations from symbol table
+            var localVars = generator.getSymbolTable().getLocalVariables();
+            for (var entry : localVars.entrySet()) {
+                String name = entry.getKey();
+                SymbolInfo info = entry.getValue();
+                String wasmType = generator.languageTypeToWasm(info.getType());
+                generator.emit("  (local $" + name + " " + wasmType + ")");
+            }
+
             generator.emit("  call $init_print_buffer");
 
-            // Process top-level statements using the improved processing
+            // Second pass: generate code for statements
             var statements = json.get("statements");
             if (statements instanceof java.util.List<?> stmtList) {
                 for (var stmt : stmtList) {

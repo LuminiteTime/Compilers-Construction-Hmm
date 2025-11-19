@@ -331,8 +331,7 @@ public class WasmCodeGenerator {
      */
     public void emitLocalDeclaration(String name, String type) {
         symbolTable.declareLocal(name, type);
-        String wasmType = languageTypeToWasm(type);
-        emit("(local $" + name + " " + wasmType + ")");
+        // Don't emit code here - locals will be emitted at function start
     }
 
     /**

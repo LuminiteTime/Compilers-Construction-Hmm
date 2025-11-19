@@ -72,11 +72,29 @@
   )
   (func $_start
     call $init_print_buffer
-    i32.const 6
-    call $print_int
+    i32.const 0
+    i32.const 1
+    i32.sub
+    i32.const 2
+    i32.add
     i32.const 3
+    i32.mul
     call $print_int
     i32.const 0
+    i32.const 0
+    i32.sub
+    i32.const 0
+    i32.add
+    i32.const 3
+    i32.mul
+    call $print_int
+    i32.const 0
+    i32.const 1
+    i32.add
+    i32.const 0
+    i32.const 2
+    i32.sub
+    i32.mul
     call $print_int
   )
   (export "_start" (func $_start))

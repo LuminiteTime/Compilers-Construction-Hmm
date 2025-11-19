@@ -72,7 +72,7 @@
   )
   (func $_start
     call $init_print_buffer
-    i32.const 1
+    i32.const 0
     call $print_int
   )
   (export "_start" (func $_start))
