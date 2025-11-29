@@ -25,9 +25,9 @@ public class SemanticAnalyzer implements ASTVisitor {
                 for (ParameterNode param : routine.getParameters()) {
                     paramTypes.add(typeFromNode(param.getType()));
                 }
-                Type returnType = routine.getReturnType() != null ? 
+                Type returnType = routine.getReturnType() != null ?
                     typeFromNode(routine.getReturnType()) : Type.VOID;
-                
+
                 Type funcType = new Type.FunctionType(paramTypes, returnType);
                 symbolTable.declare(routine.getName(), new Symbol(routine.getName(), Symbol.Kind.FUNCTION, funcType));
             } else if (decl instanceof TypeDeclarationNode) {
@@ -36,10 +36,8 @@ public class SemanticAnalyzer implements ASTVisitor {
             }
         }
 
-        // Second pass: type check and validate
-        for (ASTNode decl : program.getDeclarations()) {
-            decl.accept(this);
-        }
+        // Second pass: type check declarations and statements
+        program.accept(this);
     }
 
     private Type typeFromNode(ASTNode node) {
@@ -90,12 +88,12 @@ public class SemanticAnalyzer implements ASTVisitor {
 
     @Override
     public void visit(ProgramNode node) {
-        // First pass: collect declarations
+        // Analyze declarations (already collected in first pass)
         for (ASTNode decl : node.getDeclarations()) {
             decl.accept(this);
         }
 
-        // Second pass: analyze statements
+        // Analyze statements
         for (ASTNode stmt : node.getStatements()) {
             stmt.accept(this);
         }
@@ -364,8 +362,9 @@ public class SemanticAnalyzer implements ASTVisitor {
         if (currentExpressionType != Type.BOOLEAN) {
             addError(node.getPosition(), "If condition must be boolean");
         }
-        
+
         node.getThenBlock().accept(this);
+
         if (node.getElseBlock() != null) {
             node.getElseBlock().accept(this);
         }
@@ -377,24 +376,25 @@ public class SemanticAnalyzer implements ASTVisitor {
         if (currentExpressionType != Type.BOOLEAN) {
             addError(node.getPosition(), "While condition must be boolean");
         }
-        
+
         node.getBody().accept(this);
     }
 
     @Override
     public void visit(ForLoopNode node) {
+        // Create scope for loop variable and body
         symbolTable.enterScope();
-        
+
         // Loop variable is implicitly declared
         symbolTable.declare(node.getVariable(), new Symbol(node.getVariable(), Symbol.Kind.VARIABLE, Type.INTEGER));
-        
+
         // Validate range expressions
         if (node.getRangeStart() != null && node.getRangeEnd() != null) {
             node.getRangeStart().accept(this);
             if (currentExpressionType != Type.INTEGER) {
                 addError(node.getPosition(), "Range start must be integer");
             }
-            
+
             node.getRangeEnd().accept(this);
             if (currentExpressionType != Type.INTEGER) {
                 addError(node.getPosition(), "Range end must be integer");
@@ -405,9 +405,9 @@ public class SemanticAnalyzer implements ASTVisitor {
                 addError(node.getPosition(), "For loop array expression must be array type");
             }
         }
-        
+
         node.getBody().accept(this);
-        
+
         symbolTable.exitScope();
     }
 
@@ -427,9 +427,11 @@ public class SemanticAnalyzer implements ASTVisitor {
 
     @Override
     public void visit(BlockNode node) {
+        symbolTable.enterScope();
         for (ASTNode stmt : node.getStatements()) {
             stmt.accept(this);
         }
+        symbolTable.exitScope();
     }
 
     private boolean isAssignmentCompatible(Type target, Type source) {

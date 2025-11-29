@@ -1,6 +1,6 @@
 routine add(a : integer, b : integer) : integer
   is
-    a + b
+    return a + b
   end
 
 routine main() is
