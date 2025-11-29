@@ -104,9 +104,6 @@ auto-save-list
 tramp
 .\#*
 
-# Output directory with generated .wat files
-output/
-
 # Test files
 test_simple.i
 
