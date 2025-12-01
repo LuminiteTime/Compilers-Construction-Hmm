@@ -52,16 +52,3 @@ WebAssembly integration tests (Language I programs compiled to WAT and run under
 ```bash
 ./run_integration_wasm.sh
 ```
-
-The script:
-
-- Builds the compiler JAR if necessary.
-- Compiles each `.i` file in `tests/integration` to `output/integration/<name>.wat`.
-- Runs each module with `wasmtime`.
-- Normalizes stdout (strips whitespace) and compares it to the expected value.
-
-To run a subset of tests, pass test basenames (without `.i`):
-
-```bash
-./run_integration_wasm.sh array_sum array_stats
-```
