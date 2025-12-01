@@ -11,11 +11,13 @@ public class SemanticAnalyzer implements ASTVisitor {
     private final List<CompilationError> errors;
     private Type currentExpressionType;
     private final Deque<String> loopVariables;
+    private final Deque<Type> routineReturnTypes;
 
     public SemanticAnalyzer() {
         this.symbolTable = new SymbolTable();
         this.errors = new ArrayList<>();
         this.loopVariables = new ArrayDeque<>();
+        this.routineReturnTypes = new ArrayDeque<>();
     }
 
     public void analyze(ProgramNode program) {
@@ -144,20 +146,26 @@ public class SemanticAnalyzer implements ASTVisitor {
 
     @Override
     public void visit(RoutineDeclarationNode node) {
+        Type declaredReturnType = node.getReturnType() != null
+            ? typeFromNode(node.getReturnType())
+            : Type.VOID;
+
+        routineReturnTypes.push(declaredReturnType);
         symbolTable.enterScope();
-        
+
         // Declare parameters
         for (ParameterNode param : node.getParameters()) {
             Type paramType = typeFromNode(param.getType());
             symbolTable.declare(param.getName(), new Symbol(param.getName(), Symbol.Kind.VARIABLE, paramType));
         }
-        
+
         // Visit body
         if (node.getBody() != null) {
             node.getBody().accept(this);
         }
-        
+
         symbolTable.exitScope();
+        routineReturnTypes.pop();
     }
 
     @Override
@@ -424,8 +432,30 @@ public class SemanticAnalyzer implements ASTVisitor {
 
     @Override
     public void visit(ReturnStatementNode node) {
+        if (routineReturnTypes.isEmpty()) {
+            addError(node.getPosition(), "Return statement not allowed outside routine");
+            if (node.getValue() != null) {
+                node.getValue().accept(this);
+            }
+            return;
+        }
+
+        Type expectedType = routineReturnTypes.peek();
+
         if (node.getValue() != null) {
             node.getValue().accept(this);
+            Type actualType = currentExpressionType;
+            if (!isAssignmentCompatible(expectedType, actualType)) {
+                addError(node.getPosition(),
+                    String.format("Return type mismatch: expected %s but got %s",
+                        expectedType.getName(), actualType.getName()));
+            }
+        } else {
+            if (expectedType != Type.VOID) {
+                addError(node.getPosition(),
+                    String.format("Return type mismatch: expected %s but got void",
+                        expectedType.getName()));
+            }
         }
     }
 

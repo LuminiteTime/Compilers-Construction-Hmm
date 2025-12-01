@@ -31,6 +31,10 @@ run_test() {
         tests/new_tests/invalid_var_name_reserved_keyword.i|\
         tests/new_tests/invalid_for_loop_var_reserved_keyword.i|\
         tests/new_tests/invalid_assignment_real_to_boolean.i|\
+        tests/new_tests/invalid_return_type_real_to_bool.i|\
+        tests/new_tests/invalid_return_type_in_procedure.i|\
+        tests/new_tests/invalid_return_missing_value.i|\
+        tests/new_tests/invalid_return_outside_routine.i|\
         tests/lexer/keywords.i|\
         tests/lexer/operators.i|\
         tests/parser/complex_expressions.i|\

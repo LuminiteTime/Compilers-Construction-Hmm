@@ -1,7 +1,7 @@
-var a : integer is 28
-while true loop
-  var b is 2
-  print b
-  print a
-end
-print b
+// routine test(n : real) : integer => n + 1
+
+// // print test(true)
+
+var a : integer is true + true
+// while 88 loop
+// end
