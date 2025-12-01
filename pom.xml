@@ -91,7 +91,6 @@
                 <version>2.22.2</version>
             </plugin>
 
-            <!-- JavaCC plugin to generate parser from grammar/LanguageI.jj -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>javacc-maven-plugin</artifactId>
