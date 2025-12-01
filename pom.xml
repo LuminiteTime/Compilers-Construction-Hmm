@@ -91,6 +91,28 @@
                 <version>2.22.2</version>
             </plugin>
 
+            <!-- JavaCC plugin to generate parser from grammar/LanguageI.jj -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>javacc-maven-plugin</artifactId>
+                <version>3.1.1</version>
+                <configuration>
+                    <sourceDirectory>${project.basedir}/grammar</sourceDirectory>
+                    <outputDirectory>${project.build.directory}/generated-sources/javacc</outputDirectory>
+                    <includes>
+                        <include>LanguageI.jj</include>
+                    </includes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>javacc</id>
+                        <goals>
+                            <goal>javacc</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>

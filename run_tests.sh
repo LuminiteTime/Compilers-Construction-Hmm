@@ -30,7 +30,9 @@ run_test() {
         tests/new_tests/scoping_rules.i|\
         tests/new_tests/invalid_var_name_reserved_keyword.i|\
         tests/new_tests/invalid_for_loop_var_reserved_keyword.i|\
+        tests/new_tests/invalid_assignment_real_to_boolean.i|\
         tests/lexer/keywords.i|\
+        tests/lexer/operators.i|\
         tests/parser/complex_expressions.i|\
         tests/parser/control_flow.i|\
         tests/semantic/function_calls.i|\

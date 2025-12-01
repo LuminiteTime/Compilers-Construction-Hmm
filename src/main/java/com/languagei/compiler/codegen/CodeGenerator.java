@@ -61,6 +61,7 @@ public class CodeGenerator implements ASTVisitor {
         // Add remaining runtime functions after user code
         writeRemainingRuntimeFunctions();
 
+        // Close module
         writer.dedent();
         writer.writeLine(")");
         writer.flush();
@@ -83,11 +84,86 @@ public class CodeGenerator implements ASTVisitor {
         writer.dedent();
         writer.writeLine(")");
 
-        // print_real function (simplified - just print as int for now)
+        // print_real function - print with at most one decimal place.
+        // If the fractional digit is zero, print only the integer part (no ".0").
         writer.writeLine("(func $print_real (param $val f64)");
         writer.indent();
-        writer.writeLine("(i32.trunc_f64_s (local.get $val))");
+        writer.writeLine("(local $int i32)");
+        writer.writeLine("(local $frac i32)");
+
+        // Integer part: trunc toward zero
+        writer.writeLine("(local.set $int (i32.trunc_f64_s (local.get $val)))");
+
+        // Fractional part: round((val - int) * 10.0) to nearest integer
+        writer.writeLine("(local.set $frac");
+        writer.indent();
+        writer.writeLine("(i32.trunc_f64_s");
+        writer.indent();
+        writer.writeLine("(f64.add");
+        writer.indent();
+        writer.writeLine("(f64.mul");
+        writer.indent();
+        writer.writeLine("(f64.sub (local.get $val) (f64.convert_i32_s (local.get $int)))");
+        writer.writeLine("(f64.const 10.0)");
+        writer.dedent();
+        writer.writeLine(")"); // close f64.mul
+        writer.writeLine("(f64.const 0.5)");
+        writer.dedent();
+        writer.writeLine(")"); // close f64.add
+        writer.dedent();
+        writer.writeLine(")"); // close i32.trunc_f64_s
+        writer.dedent();
+        writer.writeLine(")"); // close local.set $frac
+
+        // Make sure fractional digit is non-negative
+        writer.writeLine("(if (i32.lt_s (local.get $frac) (i32.const 0))");
+        writer.indent();
+        writer.writeLine("(then");
+        writer.indent();
+        writer.writeLine("(local.set $frac (i32.sub (i32.const 0) (local.get $frac)))");
+        writer.dedent();
+        writer.writeLine(")");
+        writer.dedent();
+        writer.writeLine(")");
+
+        // Handle carry when rounded fractional digit becomes 10
+        writer.writeLine("(if (i32.ge_s (local.get $frac) (i32.const 10))");
+        writer.indent();
+        writer.writeLine("(then");
+        writer.indent();
+        writer.writeLine("(local.set $frac (i32.sub (local.get $frac) (i32.const 10)))");
+        writer.writeLine("(local.set $int (i32.add (local.get $int) (i32.const 1)))");
+        writer.dedent();
+        writer.writeLine(")");
+        writer.dedent();
+        writer.writeLine(")");
+
+        // If fractional digit is zero, print only the integer part
+        writer.writeLine("(if (i32.eq (local.get $frac) (i32.const 0))");
+        writer.indent();
+        writer.writeLine("(then");
+        writer.indent();
+        writer.writeLine("(local.get $int)");
         writer.writeLine("(call $print_int)");
+        writer.dedent();
+        writer.writeLine(")");
+        writer.writeLine("(else");
+        writer.indent();
+
+        // Otherwise print integer part, decimal point and one fractional digit
+        writer.writeLine("(local.get $int)");
+        writer.writeLine("(call $print_int)");
+        writer.writeLine("(i32.const 46)"); // '.'
+        writer.writeLine("(call $print_char)");
+        writer.writeLine("(local.get $frac)");
+        writer.writeLine("(call $print_int)");
+
+        writer.dedent();
+        writer.writeLine(")");
+        writer.dedent();
+        writer.writeLine(")");
+
+        // Close print_real function
         writer.dedent();
         writer.writeLine(")");
 
@@ -641,14 +717,25 @@ public class CodeGenerator implements ASTVisitor {
     @Override
     public void visit(BinaryExpressionNode node) {
         try {
-            // Determine the type of this expression for instruction selection
+            // Determine operand and result types for instruction selection and promotions
+            Type leftType = typeResolver.resolveType(node.getLeft());
+            Type rightType = typeResolver.resolveType(node.getRight());
             Type exprType = typeResolver.resolveType(node);
             currentExpressionType = exprType;
 
             // Generate left operand
             node.getLeft().accept(this);
+            if (exprType == Type.REAL && leftType == Type.INTEGER) {
+                // Promote integer operand to real
+                writer.writeLine("(f64.convert_i32_s)");
+            }
+
             // Generate right operand
             node.getRight().accept(this);
+            if (exprType == Type.REAL && rightType == Type.INTEGER) {
+                // Promote integer operand to real
+                writer.writeLine("(f64.convert_i32_s)");
+            }
 
             String instruction = getBinaryInstruction(node.getOperator(), exprType);
             writer.writeLine("(" + instruction + ")");
@@ -1015,6 +1102,9 @@ public class CodeGenerator implements ASTVisitor {
     private void generateTypeConversion(Type fromType, Type toType) throws IOException {
         if (fromType == Type.INTEGER && toType == Type.REAL) {
             // int to real
+            writer.writeLine("(f64.convert_i32_s)");
+        } else if (fromType == Type.BOOLEAN && toType == Type.REAL) {
+            // boolean to real: true -> 1.0, false -> 0.0
             writer.writeLine("(f64.convert_i32_s)");
         } else if (fromType == Type.REAL && toType == Type.INTEGER) {
             // real to int (rounding)

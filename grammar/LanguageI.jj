@@ -1,0 +1,750 @@
+options {
+  STATIC = false;
+  JAVA_UNICODE_ESCAPE = true;
+  UNICODE_INPUT = true;
+}
+
+PARSER_BEGIN(LanguageIParser)
+package com.languagei.compiler.parser.jcc;
+
+import com.languagei.compiler.ast.*;
+import com.languagei.compiler.lexer.Position;
+import java.util.*;
+
+public class LanguageIParser {
+    private String filename = "<unknown>";
+    private boolean inFunction = false;
+
+    public void setFilename(String filename) {
+        this.filename = filename;
+    }
+
+    private Position pos(Token t) {
+        return new Position(t.beginLine, t.beginColumn, 0, filename);
+    }
+}
+PARSER_END(LanguageIParser)
+
+SKIP : {
+  " " | "\t" | "\r" | "\n" | "\f"
+}
+
+SKIP : {
+  < SINGLE_LINE_COMMENT: "//" (~["\n","\r"])* (("\r")?"\n")? >
+| < MULTI_LINE_COMMENT: "/*" (~["*"] | "*" ~["/"])* "*/" >
+}
+
+TOKEN : {
+    < VAR: "var" >
+  | < TYPE: "type" >
+  | < ROUTINE: "routine" >
+  | < IS: "is" >
+  | < END: "end" >
+  | < RECORD: "record" >
+  | < ARRAY: "array" >
+  | < INTEGER: "integer" >
+  | < REAL: "real" >
+  | < BOOLEAN: "boolean" >
+  | < TRUE: "true" >
+  | < FALSE: "false" >
+  | < IF: "if" >
+  | < THEN: "then" >
+  | < ELSE: "else" >
+  | < WHILE: "while" >
+  | < LOOP: "loop" >
+  | < FOR: "for" >
+  | < IN: "in" >
+  | < REVERSE: "reverse" >
+  | < RETURN: "return" >
+  | < PRINT: "print" >
+  | < AND: "and" >
+  | < OR: "or" >
+  | < XOR: "xor" >
+  | < NOT: "not" >
+}
+
+TOKEN : {
+    < PLUS: "+" >
+  | < MINUS: "-" >
+  | < STAR: "*" >
+  | < SLASH: "/" >
+  | < PERCENT: "%" >
+  | < LT: "<" >
+  | < LE: "<=" >
+  | < GT: ">" >
+  | < GE: ">=" >
+  | < EQ: "=" >
+  | < NE: "/=" >
+  | < ASSIGN: ":=" >
+  | < ARROW: "=>" >
+  | < LPAREN: "(" >
+  | < RPAREN: ")" >
+  | < LBRACKET: "[" >
+  | < RBRACKET: "]" >
+  | < DOT: "." >
+  | < COLON: ":" >
+  | < COMMA: "," >
+  | < RANGE: ".." >
+  | < SEMICOLON: ";" >
+}
+
+TOKEN : {
+    < #DIGIT: ["0"-"9"] >
+  | < REAL_LITERAL: (<DIGIT>)+ "." (<DIGIT>)+ ( ["e","E"] ( ["+","-"] )? (<DIGIT>)+ )? >
+  | < INTEGER_LITERAL: (<DIGIT>)+ >
+}
+
+TOKEN : {
+    < IDENTIFIER: ( ["A"-"Z","a"-"z","_"] ) ( ["A"-"Z","a"-"z","0"-"9","_"] )* >
+}
+
+// =========================
+//   Grammar with AST build
+// =========================
+
+ProgramNode Program() :
+{
+    ProgramNode program = null;
+    ASTNode node;
+}
+{
+    (
+        node = TopLevelItem()
+        {
+            if (program == null) {
+                program = new ProgramNode(node.getPosition());
+            }
+            if (node instanceof VariableDeclarationNode ||
+                node instanceof TypeDeclarationNode ||
+                node instanceof RoutineDeclarationNode) {
+                program.addDeclaration(node);
+            } else {
+                program.addStatement(node);
+            }
+        }
+        ( <SEMICOLON> )*
+    )*
+    <EOF>
+    {
+        if (program == null) {
+            // Empty program
+            program = new ProgramNode(new Position(1, 1, 0, filename));
+        }
+        return program;
+    }
+}
+
+ASTNode TopLevelItem() :
+{
+    ASTNode node;
+}
+{
+      node = RoutineDeclaration()   { return node; }
+    | node = VariableDeclaration()  { return node; }
+    | node = TypeDeclaration()      { return node; }
+    | node = Statement()            { return node; }
+}
+
+ASTNode BlockItem() :
+{
+    ASTNode node;
+}
+{
+      node = VariableDeclaration()  { return node; }
+    | node = TypeDeclaration()      { return node; }
+    | node = Statement()            { return node; }
+}
+
+BlockNode Block() :
+{
+    BlockNode block = null;
+    ASTNode node;
+}
+{
+    (
+        node = BlockItem()
+        {
+            if (block == null) {
+                block = new BlockNode(node.getPosition());
+            }
+            block.addStatement(node);
+        }
+        ( <SEMICOLON> )*
+    )*
+    {
+        if (block == null) {
+            block = new BlockNode(new Position(1, 1, 0, filename));
+        }
+        return block;
+    }
+}
+
+// Declarations
+
+VariableDeclarationNode VariableDeclaration() :
+{
+    Token varTok;
+    Token id;
+    ASTNode type = null;
+    ASTNode initializer = null;
+    Position pos;
+}
+{
+    varTok = <VAR> { pos = pos(varTok); }
+    id = <IDENTIFIER>
+    (
+        <COLON> type = Type() ( <IS> initializer = Expression() )?
+      |
+        <IS>
+        (
+            LOOKAHEAD(<ARRAY>) type = Type()
+          |
+            initializer = Expression()
+        )
+    )
+    {
+        return new VariableDeclarationNode(pos, id.image, type, initializer);
+    }
+}
+
+TypeDeclarationNode TypeDeclaration() :
+{
+    Token typeTok;
+    Token id;
+    ASTNode type;
+    Position pos;
+}
+{
+    typeTok = <TYPE> { pos = pos(typeTok); }
+    id = <IDENTIFIER>
+    <IS>
+    type = Type()
+    {
+        return new TypeDeclarationNode(pos, id.image, type);
+    }
+}
+
+RoutineDeclarationNode RoutineDeclaration() :
+{
+    Token routineTok;
+    Token id;
+    List<ParameterNode> params = new ArrayList<>();
+    ParameterNode param;
+    ASTNode returnType = null;
+    BlockNode body = null;
+    ASTNode expr;
+    Position pos;
+}
+{
+    routineTok = <ROUTINE> { pos = pos(routineTok); }
+    id = <IDENTIFIER>
+    <LPAREN>
+    (
+        param = Parameter() { params.add(param); }
+        ( <COMMA> param = Parameter() { params.add(param); } )*
+    )?
+    <RPAREN>
+    ( <COLON> returnType = Type() )?
+    (
+        <IS>
+        (
+            LOOKAHEAD(
+                  <VAR>
+                | <TYPE>
+                | <IF>
+                | <WHILE>
+                | <FOR>
+                | <RETURN>
+                | <PRINT>
+                | <END>
+                | <IDENTIFIER> <ASSIGN>
+                | <IDENTIFIER> <LPAREN>
+                | <IDENTIFIER> <LBRACKET>
+                | <IDENTIFIER> <DOT>
+            )
+            {
+                boolean prev = inFunction;
+                inFunction = true;
+            }
+            body = Block()
+            {
+                inFunction = prev;
+            }
+            <END>
+          |
+            expr = Expression()
+            <END>
+            {
+                body = new BlockNode(expr.getPosition());
+                body.addStatement(new ReturnStatementNode(expr.getPosition(), expr));
+            }
+        )
+      |
+        <ARROW>
+            expr = Expression()
+            {
+                body = new BlockNode(expr.getPosition());
+                body.addStatement(new ReturnStatementNode(expr.getPosition(), expr));
+            }
+    )?
+    {
+        return new RoutineDeclarationNode(pos, id.image, params, returnType, body);
+    }
+}
+
+ParameterNode Parameter() :
+{
+    Token id;
+    ASTNode type;
+    Position pos;
+}
+{
+    id = <IDENTIFIER> { pos = pos(id); }
+    <COLON>
+    type = Type()
+    {
+        return new ParameterNode(pos, id.image, type);
+    }
+}
+
+// Types
+
+ASTNode Type() :
+{
+    Token t;
+    ASTNode size = null;
+    ASTNode elementType;
+    RecordTypeNode rec;
+    VariableDeclarationNode field;
+    Token fieldId;
+    ASTNode fieldType;
+    Position pos;
+}
+{
+    t = <INTEGER> { return new PrimitiveTypeNode(pos(t), PrimitiveTypeNode.PrimitiveType.INTEGER); }
+  |
+    t = <REAL> { return new PrimitiveTypeNode(pos(t), PrimitiveTypeNode.PrimitiveType.REAL); }
+  |
+    t = <BOOLEAN> { return new PrimitiveTypeNode(pos(t), PrimitiveTypeNode.PrimitiveType.BOOLEAN); }
+  |
+    t = <ARRAY>
+    {
+        pos = pos(t);
+    }
+    (
+        <LBRACKET>
+            ( size = Expression() )?
+        <RBRACKET>
+    )?
+    elementType = Type()
+    {
+        return new ArrayTypeNode(pos, size, elementType);
+    }
+  |
+    t = <RECORD>
+    {
+        pos = pos(t);
+        rec = new RecordTypeNode(pos);
+    }
+    (
+        (
+            field = VariableDeclaration()
+          |
+            fieldId = <IDENTIFIER>
+            {
+                Position fpos = pos(fieldId);
+            }
+            <COLON>
+            fieldType = Type()
+            {
+                field = new VariableDeclarationNode(fpos, fieldId.image, fieldType, null);
+            }
+        )
+        {
+            rec.addField(field);
+        }
+        ( <SEMICOLON> )*
+    )*
+    <END>
+    {
+        return rec;
+    }
+  |
+    t = <IDENTIFIER> { return new TypeReferenceNode(pos(t), t.image); }
+}
+
+// Statements
+
+ASTNode Statement() :
+{
+    ASTNode s;
+}
+{
+      s = IfStatement()         { return s; }
+    | s = WhileStatement()      { return s; }
+    | s = ForStatement()        { return s; }
+    | s = ReturnStatement()     { return s; }
+    | s = PrintStatement()      { return s; }
+    | s = AssignmentOrCall()
+      {
+          if (s instanceof AssignmentNode || s instanceof RoutineCallNode) {
+              return s;
+          }
+          if (inFunction) {
+              return new ReturnStatementNode(s.getPosition(), s);
+          }
+          throw new ParseException("Expected statement at " + getToken(1).beginLine + ":" + getToken(1).beginColumn);
+      }
+}
+
+IfStatementNode IfStatement() :
+{
+    ASTNode condition;
+    BlockNode thenBlock;
+    BlockNode elseBlock = null;
+    Token ifTok;
+    Position pos;
+}
+{
+    ifTok = <IF> { pos = pos(ifTok); }
+    condition = Expression()
+    <THEN>
+    thenBlock = Block()
+    [ <ELSE> elseBlock = Block() ]
+    <END>
+    {
+        return new IfStatementNode(pos, condition, thenBlock, elseBlock);
+    }
+}
+
+WhileLoopNode WhileStatement() :
+{
+    ASTNode condition;
+    BlockNode body;
+    Token whileTok;
+    Position pos;
+}
+{
+    whileTok = <WHILE> { pos = pos(whileTok); }
+    condition = Expression()
+    <LOOP>
+    body = Block()
+    <END>
+    {
+        return new WhileLoopNode(pos, condition, body);
+    }
+}
+
+ForLoopNode ForStatement() :
+{
+    Token forTok;
+    Token idTok;
+    ASTNode expr;
+    ASTNode rangeStart = null;
+    ASTNode rangeEnd = null;
+    ASTNode arrayExpr = null;
+    boolean reverse = false;
+    BlockNode body;
+    Position pos;
+}
+{
+    forTok = <FOR> { pos = pos(forTok); }
+    idTok = <IDENTIFIER>
+    <IN>
+    expr = Relation()
+    (
+        <RANGE>
+        {
+            rangeStart = expr;
+        }
+        rangeEnd = Relation()
+      |
+        {
+            arrayExpr = expr;
+        }
+    )
+    [ <REVERSE> { reverse = true; } ]
+    <LOOP>
+    body = Block()
+    <END>
+    {
+        return new ForLoopNode(pos, idTok.image, rangeStart, rangeEnd, arrayExpr, reverse, body);
+    }
+}
+
+ReturnStatementNode ReturnStatement() :
+{
+    Token retTok;
+    ASTNode value = null;
+    Position pos;
+}
+{
+    retTok = <RETURN> { pos = pos(retTok); }
+    [ value = Expression() ]
+    {
+        return new ReturnStatementNode(pos, value);
+    }
+}
+
+PrintStatementNode PrintStatement() :
+{
+    Token printTok;
+    PrintStatementNode print;
+    ASTNode expr;
+    Position pos;
+}
+{
+    printTok = <PRINT> { pos = pos(printTok); print = new PrintStatementNode(pos); }
+    expr = Expression() { print.addExpression(expr); }
+    ( <COMMA> expr = Expression() { print.addExpression(expr); } )*
+    {
+        return print;
+    }
+}
+
+ASTNode AssignmentOrCall() :
+{
+    ASTNode expr;
+    ASTNode value;
+}
+{
+    expr = Expression()
+    (
+        <ASSIGN>
+        value = Expression()
+        {
+            return new AssignmentNode(expr.getPosition(), expr, value);
+        }
+      |
+        {
+            // Expression or routine call; actual validation is done in Statement().
+            return expr;
+        }
+    )
+}
+
+// Expressions
+
+ASTNode Expression() :
+{
+    ASTNode expr;
+}
+{
+    expr = LogicalOr()
+    { return expr; }
+}
+
+ASTNode LogicalOr() :
+{
+    ASTNode expr;
+    ASTNode right;
+    Token op;
+}
+{
+    expr = LogicalXor()
+    (
+        op = <OR>
+        right = LogicalXor()
+        {
+            expr = new BinaryExpressionNode(pos(op), expr, BinaryExpressionNode.Operator.OR, right);
+        }
+    )*
+    { return expr; }
+}
+
+ASTNode LogicalXor() :
+{
+    ASTNode expr;
+    ASTNode right;
+    Token op;
+}
+{
+    expr = LogicalAnd()
+    (
+        op = <XOR>
+        right = LogicalAnd()
+        {
+            expr = new BinaryExpressionNode(pos(op), expr, BinaryExpressionNode.Operator.XOR, right);
+        }
+    )*
+    { return expr; }
+}
+
+ASTNode LogicalAnd() :
+{
+    ASTNode expr;
+    ASTNode right;
+    Token op;
+}
+{
+    expr = Relation()
+    (
+        op = <AND>
+        right = Relation()
+        {
+            expr = new BinaryExpressionNode(pos(op), expr, BinaryExpressionNode.Operator.AND, right);
+        }
+    )*
+    { return expr; }
+}
+
+ASTNode Relation() :
+{
+    ASTNode expr;
+    ASTNode right;
+    Token op = null;
+    BinaryExpressionNode.Operator operator = null;
+}
+{
+    expr = Additive()
+    (
+        (
+            op = <LT>  { operator = BinaryExpressionNode.Operator.LT; }
+          | op = <LE>  { operator = BinaryExpressionNode.Operator.LE; }
+          | op = <GT>  { operator = BinaryExpressionNode.Operator.GT; }
+          | op = <GE>  { operator = BinaryExpressionNode.Operator.GE; }
+          | op = <EQ>  { operator = BinaryExpressionNode.Operator.EQ; }
+          | op = <NE>  { operator = BinaryExpressionNode.Operator.NE; }
+        )
+        right = Additive()
+        {
+            expr = new BinaryExpressionNode(pos(op), expr, operator, right);
+        }
+    )?
+    { return expr; }
+}
+
+ASTNode Additive() :
+{
+    ASTNode expr;
+    ASTNode right;
+    Token op;
+}
+{
+    expr = Multiplicative()
+    (
+        op = <PLUS>
+        right = Multiplicative()
+        {
+            expr = new BinaryExpressionNode(pos(op), expr, BinaryExpressionNode.Operator.PLUS, right);
+        }
+      |
+        op = <MINUS>
+        right = Multiplicative()
+        {
+            expr = new BinaryExpressionNode(pos(op), expr, BinaryExpressionNode.Operator.MINUS, right);
+        }
+    )*
+    { return expr; }
+}
+
+ASTNode Multiplicative() :
+{
+    ASTNode expr;
+    ASTNode right;
+    Token op;
+}
+{
+    expr = Unary()
+    (
+        op = <STAR>
+        right = Unary()
+        {
+            expr = new BinaryExpressionNode(pos(op), expr, BinaryExpressionNode.Operator.MULTIPLY, right);
+        }
+      |
+        op = <SLASH>
+        right = Unary()
+        {
+            expr = new BinaryExpressionNode(pos(op), expr, BinaryExpressionNode.Operator.DIVIDE, right);
+        }
+      |
+        op = <PERCENT>
+        right = Unary()
+        {
+            expr = new BinaryExpressionNode(pos(op), expr, BinaryExpressionNode.Operator.MODULO, right);
+        }
+    )*
+    { return expr; }
+}
+
+ASTNode Unary() :
+{
+    ASTNode expr;
+    Token op;
+}
+{
+      op = <PLUS>  expr = Unary() { return new UnaryExpressionNode(pos(op), UnaryExpressionNode.Operator.PLUS,  expr); }
+    | op = <MINUS> expr = Unary() { return new UnaryExpressionNode(pos(op), UnaryExpressionNode.Operator.MINUS, expr); }
+    | op = <NOT>   expr = Unary() { return new UnaryExpressionNode(pos(op), UnaryExpressionNode.Operator.NOT,   expr); }
+    | expr = PrimaryWithPostfix() { return expr; }
+}
+
+ASTNode PrimaryWithPostfix() :
+{
+    ASTNode expr;
+}
+{
+    expr = Primary()
+    (
+        expr = PostfixTail(expr)
+    )*
+    { return expr; }
+}
+
+ASTNode PostfixTail(ASTNode expr) :
+{
+    ASTNode index;
+    ASTNode arg;
+    Token idTok;
+    RoutineCallNode call;
+    Token lparen;
+}
+{
+      <LBRACKET>
+        index = Expression()
+        <RBRACKET>
+        {
+            expr = new ArrayAccessNode(expr.getPosition(), expr, index);
+            return expr;
+        }
+    |
+      <DOT>
+        idTok = <IDENTIFIER>
+        {
+            expr = new RecordAccessNode(expr.getPosition(), expr, idTok.image);
+            return expr;
+        }
+    |
+      lparen = <LPAREN>
+        {
+            if (!(expr instanceof IdentifierNode)) {
+                throw new ParseException("Expected routine name before '(' at " + lparen.beginLine + ":" + lparen.beginColumn);
+            }
+            IdentifierNode idNode = (IdentifierNode) expr;
+            call = new RoutineCallNode(idNode.getPosition(), idNode.getName());
+        }
+        (
+            arg = Expression() { call.addArgument(arg); }
+            ( <COMMA> arg = Expression() { call.addArgument(arg); } )*
+        )?
+        <RPAREN>
+        {
+            expr = call;
+            return expr;
+        }
+}
+
+ASTNode Primary() :
+{
+    Token t;
+    ASTNode expr;
+}
+{
+      t = <TRUE>           { return new LiteralNode(pos(t), Boolean.TRUE); }
+    | t = <FALSE>          { return new LiteralNode(pos(t), Boolean.FALSE); }
+    | t = <INTEGER_LITERAL>{ return new LiteralNode(pos(t), Long.valueOf(t.image)); }
+    | t = <REAL_LITERAL>   { return new LiteralNode(pos(t), Double.valueOf(t.image)); }
+    | t = <IDENTIFIER>     { return new IdentifierNode(pos(t), t.image); }
+    | <LPAREN> expr = Expression() <RPAREN> { return expr; }
+}

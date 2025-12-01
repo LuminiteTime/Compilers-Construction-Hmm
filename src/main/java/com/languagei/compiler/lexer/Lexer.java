@@ -266,5 +266,12 @@ public class Lexer {
     public Position getPosition() {
         return getCurrentPosition();
     }
-}
 
+    public String getInput() {
+        return input;
+    }
+
+    public String getFilename() {
+        return filename;
+    }
+}
