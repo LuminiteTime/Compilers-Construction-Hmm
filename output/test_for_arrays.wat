@@ -1,12 +1,12 @@
 (module
   (import "wasi_snapshot_preview1" "fd_write" (func $fd_write (param i32 i32 i32 i32) (result i32)))
   (import "wasi_snapshot_preview1" "proc_exit" (func $proc_exit (param i32)))
-  (memory 1)
+  (memory (export "memory") 1)
   (data (i32.const 1024) "\00\00\00\00\00\00\00\00")
   (data (i32.const 2048) "\00\00\00\00\00\00\00\00")
   (global $heap_ptr (mut i32) (i32.const 0))
   ;; Main entry point
-  (func $_start
+  (func $_start (export "_start")
     ;; Local variables
     (local $arr i32)
     (local $x i32)
@@ -71,6 +71,9 @@
     (call $proc_exit)
   )
   (func $print_int (param $val i32)
+    (local.get $val)
+    (call $int_to_string)
+    (call $write_string)
   )
   (func $print_real (param $val f64)
     (i32.trunc_f64_s (local.get $val))
@@ -103,6 +106,7 @@
       )
     )
     (call $reverse_string (i32.const 1024) (local.get $digits))
+    (i32.store8 (i32.add (i32.const 1024) (local.get $digits)) (i32.const 0))
   )
   (func $reverse_string (param $ptr i32) (param $len i32)
     (local $i i32)

@@ -5,6 +5,7 @@ import com.languagei.compiler.lexer.Lexer;
 import com.languagei.compiler.lexer.Token;
 import com.languagei.compiler.lexer.TokenType;
 import com.languagei.compiler.lexer.Position;
+import com.languagei.compiler.lexer.KeywordTable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -70,6 +71,10 @@ public class Parser {
     private VariableDeclarationNode parseVariableDeclaration() {
         Position pos = current.getPosition();
         consume(TokenType.VAR, "Expected 'var'");
+        // Disallow reserved keywords as variable names
+        if (KeywordTable.isKeyword(current.getLexeme())) {
+            throw new RuntimeException("Invalid variable name: '" + current.getLexeme() + "' is a reserved keyword at " + current.getPosition());
+        }
         String name = consume(TokenType.IDENTIFIER, "Expected identifier").getLexeme();
 
         ASTNode type = null;
@@ -164,8 +169,20 @@ public class Parser {
             RecordTypeNode record = new RecordTypeNode(pos);
             while (!check(TokenType.END) && !check(TokenType.EOF)) {
                 if (check(TokenType.VAR)) {
+                    // Field declared with 'var' (used in type declarations)
                     VariableDeclarationNode field = parseVariableDeclaration();
                     record.addField(field);
+                } else if (check(TokenType.IDENTIFIER)) {
+                    // Inline record field without 'var' (used in variable declarations)
+                    Position fieldPos = current.getPosition();
+                    String fieldName = advance().getLexeme();
+                    consume(TokenType.COLON, "Expected ':' in record field");
+                    ASTNode fieldType = parseType();
+                    VariableDeclarationNode field = new VariableDeclarationNode(fieldPos, fieldName, fieldType, null);
+                    record.addField(field);
+                } else {
+                    // Unexpected token inside record - break to avoid infinite loop
+                    break;
                 }
                 while (match(TokenType.NEWLINE, TokenType.SEMICOLON)) {
                     // consume separators
@@ -261,6 +278,10 @@ public class Parser {
 
     private ForLoopNode parseForLoop() {
         Position pos = previous.getPosition();
+        // Disallow reserved keywords as loop variable names
+        if (KeywordTable.isKeyword(current.getLexeme())) {
+            throw new RuntimeException("Invalid loop variable name: '" + current.getLexeme() + "' is a reserved keyword at " + current.getPosition());
+        }
         String variable = consume(TokenType.IDENTIFIER, "Expected loop variable").getLexeme();
         consume(TokenType.IN, "Expected 'in'");
 

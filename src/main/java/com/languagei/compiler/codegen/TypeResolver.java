@@ -10,6 +10,15 @@ import com.languagei.compiler.semantic.Type;
 public class TypeResolver implements ASTVisitor {
 
     private Type currentType;
+    private final VariableScopeManager scopeManager;
+
+    public TypeResolver() {
+        this.scopeManager = null;
+    }
+
+    public TypeResolver(VariableScopeManager scopeManager) {
+        this.scopeManager = scopeManager;
+    }
 
     public Type resolveType(ASTNode node) {
         currentType = null;
@@ -49,21 +58,18 @@ public class TypeResolver implements ASTVisitor {
     @Override
     public void visit(ArrayTypeNode node) {
         // Array type - for now return INTEGER as placeholder
-        // TODO: Implement proper array type handling
         currentType = Type.INTEGER;
     }
 
     @Override
     public void visit(RecordTypeNode node) {
         // Record type - for now return INTEGER as placeholder
-        // TODO: Implement proper record type handling
         currentType = Type.INTEGER;
     }
 
     @Override
     public void visit(TypeReferenceNode node) {
         // Type reference - for now return INTEGER as placeholder
-        // TODO: Implement proper type alias resolution
         currentType = Type.INTEGER;
     }
 
@@ -106,9 +112,21 @@ public class TypeResolver implements ASTVisitor {
 
     @Override
     public void visit(IdentifierNode node) {
-        // For type inference, we can't resolve variable types here
-        // This should be handled by the semantic analyzer
-        // For now, return INTEGER as placeholder
+        // Try to infer identifier type from the codegen variable scope, if available
+        if (scopeManager != null) {
+            VariableScopeManager.VariableInfo var = scopeManager.lookupVariable(node.getName());
+            if (var != null) {
+                if ("f64".equals(var.wasmType)) {
+                    currentType = Type.REAL;
+                    return;
+                }
+                // All other locals are represented as i32 (integers / booleans / pointers)
+                currentType = Type.INTEGER;
+                return;
+            }
+        }
+
+        // Fallback: default to INTEGER when we have no better information
         currentType = Type.INTEGER;
     }
 

@@ -14,6 +14,8 @@ public class CodeGenerator implements ASTVisitor {
     private final TypeResolver typeResolver;
     private final TypeEnvironment typeEnvironment;
     private final FunctionEnvironment functionEnvironment;
+    private final Map<String, RecordTypeNode> recordVarTypes;
+    private final Map<String, ASTNode> variableTypeAsts;
     private String currentFunction;
     private final List<String> functions;
     private final StringBuilder functionDefs;
@@ -23,11 +25,13 @@ public class CodeGenerator implements ASTVisitor {
     public CodeGenerator(Writer output) throws IOException {
         this.writer = new WATWriter(output);
         this.scopeManager = new VariableScopeManager();
-        this.typeResolver = new TypeResolver();
+        this.typeResolver = new TypeResolver(this.scopeManager);
         this.typeEnvironment = new TypeEnvironment();
         this.functionEnvironment = new FunctionEnvironment();
         this.functions = new ArrayList<>();
         this.functionDefs = new StringBuilder();
+        this.recordVarTypes = new HashMap<>();
+        this.variableTypeAsts = new HashMap<>();
     }
 
     public void generate(ProgramNode program) throws IOException {
@@ -38,8 +42,8 @@ public class CodeGenerator implements ASTVisitor {
         // Runtime functions with imports (MUST be first)
         writeRuntimeFunctions();
 
-        // Memory section
-        writer.writeLine("(memory 1)");
+        // Memory section (exported as "memory" for WASI)
+        writer.writeLine("(memory (export \"memory\") 1)");
 
         // Data section for string output buffer
         writer.writeLine("(data (i32.const 1024) \"\\00\\00\\00\\00\\00\\00\\00\\00\")"); // Space for output buffer
@@ -50,6 +54,9 @@ public class CodeGenerator implements ASTVisitor {
 
         // Generate the program (includes user-defined functions and main)
         program.accept(this);
+
+        // Export the WASI entry point so that the runtime invokes our main wrapper
+        writer.writeLine("(export \"_start\" (func $_start))");
 
         // Add remaining runtime functions after user code
         writeRemainingRuntimeFunctions();
@@ -68,10 +75,11 @@ public class CodeGenerator implements ASTVisitor {
     }
 
     private void writeRemainingRuntimeFunctions() throws IOException {
-        // print_int function - no-op for testing
+        // print_int function - convert integer to string and write it using WASI
         writer.writeLine("(func $print_int (param $val i32)");
         writer.indent();
-        // Do nothing
+        writer.writeLine("(call $int_to_string (local.get $val))");
+        writer.writeLine("(call $write_string)");
         writer.dedent();
         writer.writeLine(")");
 
@@ -122,6 +130,8 @@ public class CodeGenerator implements ASTVisitor {
         writer.dedent();
         writer.writeLine(")");
         writer.writeLine("(call $reverse_string (i32.const 1024) (local.get $digits))");
+        // Null-terminate the string so that string_length stops after the current number
+        writer.writeLine("(i32.store8 (i32.add (i32.const 1024) (local.get $digits)) (i32.const 0))");
         writer.dedent();
         writer.writeLine(")");
 
@@ -169,6 +179,16 @@ public class CodeGenerator implements ASTVisitor {
         writer.dedent();
         writer.writeLine(")");
         writer.writeLine("(drop)"); // ignore result
+        writer.dedent();
+        writer.writeLine(")");
+
+        // print_char function - print a single ASCII character
+        writer.writeLine("(func $print_char (param $ch i32)");
+        writer.indent();
+        // Store character and null-terminate buffer at 1024, then reuse write_string
+        writer.writeLine("(i32.store8 (i32.const 1024) (local.get $ch))");
+        writer.writeLine("(i32.store8 (i32.add (i32.const 1024) (i32.const 1)) (i32.const 0))");
+        writer.writeLine("(call $write_string)");
         writer.dedent();
         writer.writeLine(")");
 
@@ -262,6 +282,8 @@ public class CodeGenerator implements ASTVisitor {
         try {
             currentFunction = "main";
             scopeManager.resetForNewFunction();
+            recordVarTypes.clear();
+            variableTypeAsts.clear();
 
             // Collect all local variables from declarations (variables only, functions handled separately) and statements
             for (ASTNode decl : node.getDeclarations()) {
@@ -277,18 +299,14 @@ public class CodeGenerator implements ASTVisitor {
             writer.writeLine(";; Main entry point");
             writer.writeOpenParen("func $_start");
 
-            // Generate local variable declarations
+            // Generate local variable declarations (deduplicated by name)
             if (!scopeManager.getFunctionLocals().isEmpty()) {
                 writer.writeLine(";; Local variables");
+                java.util.Set<String> emitted = new java.util.HashSet<>();
                 for (VariableScopeManager.VariableInfo local : scopeManager.getFunctionLocals()) {
-                    writer.writeLine(String.format("(local $%s %s)", local.name, local.wasmType));
-                }
-            }
-
-            // Generate variable initialization from declarations
-            for (ASTNode decl : node.getDeclarations()) {
-                if (decl instanceof VariableDeclarationNode) {
-                    decl.accept(this);
+                    if (emitted.add(local.name)) {
+                        writer.writeLine(String.format("(local $%s %s)", local.name, local.wasmType));
+                    }
                 }
             }
 
@@ -305,32 +323,52 @@ public class CodeGenerator implements ASTVisitor {
             }
 
             if (hasMain) {
-                // Call main function
+                // For programs with an explicit main, preserve existing behaviour:
+                // initialize all global variables, then call main.
+                for (ASTNode decl : node.getDeclarations()) {
+                    if (decl instanceof VariableDeclarationNode) {
+                        decl.accept(this);
+                    }
+                }
                 writer.writeLine("(call $main)");
-                writer.writeLine("(call $proc_exit)");
             } else {
-                // Generate all statements
-                for (ASTNode stmt : node.getStatements()) {
-                    stmt.accept(this);
+                // Programs without main: execute top-level declarations (with initializers)
+                // and statements strictly in source order. This is important for tests like
+                // array_stats.i, where array element assignments must happen before calls to
+                // sum_array/min_array/max_array.
+
+                java.util.List<ASTNode> topLevel = new java.util.ArrayList<>();
+
+                // Include only variable declarations; type and routine declarations are
+                // handled separately above and do not produce runtime code.
+                for (ASTNode decl : node.getDeclarations()) {
+                    if (decl instanceof VariableDeclarationNode) {
+                        topLevel.add(decl);
+                    }
                 }
 
-                // Exit with the value of the last declared variable in global scope
-                if (lastVariable != null) {
-                    VariableScopeManager.VariableInfo varInfo = scopeManager.lookupVariable(lastVariable);
-                    if (varInfo != null && "i32".equals(varInfo.wasmType)) {
-                        writer.writeLine("(local.get $" + lastVariable + ")");
-                        writer.writeLine("(call $proc_exit)");
-                    } else {
-                        // Non-integer variables can't be used as exit code
-                        writer.writeLine("(i32.const 0)");
-                        writer.writeLine("(call $proc_exit)");
-                    }
-                } else {
-                    // Default exit code 0
-                    writer.writeLine("(i32.const 0)");
-                    writer.writeLine("(call $proc_exit)");
+                // Include all top-level statements (assignments, prints, etc.)
+                topLevel.addAll(node.getStatements());
+
+                // Sort by source position to reconstruct original order
+                topLevel.sort((a, b) -> {
+                    com.languagei.compiler.lexer.Position pa = a.getPosition();
+                    com.languagei.compiler.lexer.Position pb = b.getPosition();
+                    int lineCmp = Integer.compare(pa.getLine(), pb.getLine());
+                    if (lineCmp != 0) return lineCmp;
+                    int colCmp = Integer.compare(pa.getColumn(), pb.getColumn());
+                    if (colCmp != 0) return colCmp;
+                    return Integer.compare(pa.getOffset(), pb.getOffset());
+                });
+
+                for (ASTNode n : topLevel) {
+                    n.accept(this);
                 }
             }
+
+            // Always terminate the WASI process with exit code 0
+            writer.writeLine("(i32.const 0)");
+            writer.writeLine("(call $proc_exit)");
             writer.writeCloseParen();
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -342,30 +380,62 @@ public class CodeGenerator implements ASTVisitor {
         // Variable declarations are handled during collection phase
         // Only generate initialization code if there's an initializer
         try {
-            if (node.getType() instanceof ArrayTypeNode) {
-                // Array variable - need to allocate memory
-                ArrayTypeNode arrayType = (ArrayTypeNode) node.getType();
+            // Resolve type aliases so we can distinguish arrays and records behind TypeReferenceNode
+            ASTNode declaredType = node.getType();
+            ASTNode resolvedTypeAst = declaredType;
+            if (declaredType instanceof TypeReferenceNode) {
+                TypeReferenceNode ref = (TypeReferenceNode) declaredType;
+                ASTNode aliased = typeEnvironment.resolveType(ref.getName());
+                if (aliased != null) {
+                    resolvedTypeAst = aliased;
+                }
+            }
+
+            if (resolvedTypeAst instanceof ArrayTypeNode) {
+                // Array variable (including aliases to arrays) - allocate memory
+                ArrayTypeNode arrayType = (ArrayTypeNode) resolvedTypeAst;
 
                 if (arrayType.getSizeExpression() != null) {
-                    // Fixed-size array - allocate memory
+                    // Fixed-size array - allocate memory: size * element_size
                     arrayType.getSizeExpression().accept(this); // Size expression
-                    writer.writeLine("(i32.const 4)"); // Element size (assume i32 for now)
+
+                    // Compute element size based on the array's element type
+                    int elementSize = getArrayElementSize(arrayType);
+                    writer.writeLine("(i32.const " + elementSize + ")");
                     writer.writeLine("(call $allocate_array)");
                     writer.writeLine("(local.set $" + node.getName() + ")");
                 }
-                // TODO: Handle dynamic arrays and initialization
-            } else if (node.getType() instanceof RecordTypeNode) {
-                // Record variable - need to allocate memory
-                RecordTypeNode recordType = (RecordTypeNode) node.getType();
+            } else if (resolvedTypeAst instanceof RecordTypeNode) {
+                // Record variable (including aliases to records) - allocate memory
+                RecordTypeNode recordType = (RecordTypeNode) resolvedTypeAst;
 
                 // Calculate record size (sum of field sizes)
                 int recordSize = calculateRecordSize(recordType);
                 writer.writeLine("(i32.const " + recordSize + ")"); // Record size
                 writer.writeLine("(call $allocate_record)");
                 writer.writeLine("(local.set $" + node.getName() + ")");
+
+                // Remember record type for this variable (for field access offsets)
+                recordVarTypes.put(node.getName(), recordType);
             } else if (node.getInitializer() != null) {
                 // Regular variable with initializer
+                // Determine target type (if explicitly specified as primitive)
+                Type targetType = null;
+                if (node.getType() instanceof PrimitiveTypeNode) {
+                    targetType = typeFromNode(node.getType());
+                }
+
+                // Determine source expression type using the type resolver
+                Type sourceType = typeResolver.resolveType(node.getInitializer());
+
+                // Generate initializer expression
                 node.getInitializer().accept(this);
+
+                // If target and source primitive types differ, insert a conversion
+                if (targetType != null && sourceType != null && targetType != sourceType) {
+                    generateTypeConversion(sourceType, targetType);
+                }
+
                 writer.writeLine("(local.set $" + node.getName() + ")");
             }
 
@@ -413,6 +483,11 @@ public class CodeGenerator implements ASTVisitor {
                 wasmType = "i32";
             }
 
+            // Remember the (possibly alias-resolved) type AST for this variable
+            if (resolvedType != null) {
+                variableTypeAsts.put(varDecl.getName(), resolvedType);
+            }
+
             scopeManager.declareVariable(varDecl.getName(), wasmType);
         } else if (node instanceof BlockNode) {
             BlockNode block = (BlockNode) node;
@@ -438,15 +513,19 @@ public class CodeGenerator implements ASTVisitor {
             scopeManager.exitScope();
         } else if (node instanceof ForLoopNode) {
             ForLoopNode forLoop = (ForLoopNode) node;
-            // Declare the loop variable in current scope
-            scopeManager.declareVariable(forLoop.getVariable(), "i32");
-            if (forLoop.getArrayExpr() != null) {
-                // For array iteration, we need an index variable
-                scopeManager.declareVariable(forLoop.getVariable() + "_index", "i32");
+            // Loop variable lives in the surrounding scope of the loop.
+            // If a variable with the same name already exists, reuse it instead of redeclaring.
+            if (scopeManager.lookupVariable(forLoop.getVariable()) == null) {
+                scopeManager.declareVariable(forLoop.getVariable(), "i32");
             }
-            scopeManager.enterScope();
+            if (forLoop.getArrayExpr() != null) {
+                String indexName = forLoop.getVariable() + "_index";
+                if (scopeManager.lookupVariable(indexName) == null) {
+                    scopeManager.declareVariable(indexName, "i32");
+                }
+            }
+            // Recurse into loop body; BlockNode handling will manage inner scopes as needed.
             collectLocalVariables(forLoop.getBody());
-            scopeManager.exitScope();
         }
     }
 
@@ -467,6 +546,8 @@ public class CodeGenerator implements ASTVisitor {
         try {
             currentFunction = node.getName();
             scopeManager.resetForNewFunction();
+            recordVarTypes.clear();
+            variableTypeAsts.clear();
 
             writer.writeLine(";; Function " + node.getName());
             writer.writeOpenParen("func $" + node.getName());
@@ -476,6 +557,22 @@ public class CodeGenerator implements ASTVisitor {
                 String wasmType = typeToWasm(typeFromParamNode(param));
                 writer.writeLine(String.format("(param $%s %s)", param.getName(), wasmType));
                 scopeManager.declareVariable(param.getName(), wasmType);
+
+                // Track parameter type AST (with aliases resolved) for field offset and array element size calculations
+                ASTNode paramTypeAst = param.getType();
+                if (paramTypeAst instanceof TypeReferenceNode) {
+                    TypeReferenceNode ref = (TypeReferenceNode) paramTypeAst;
+                    ASTNode aliased = typeEnvironment.resolveType(ref.getName());
+                    if (aliased != null) {
+                        paramTypeAst = aliased;
+                    }
+                }
+                variableTypeAsts.put(param.getName(), paramTypeAst);
+
+                // Track record-typed parameters so that record field access can compute offsets
+                if (paramTypeAst instanceof RecordTypeNode) {
+                    recordVarTypes.put(param.getName(), (RecordTypeNode) paramTypeAst);
+                }
             }
 
             // Return type
@@ -488,14 +585,28 @@ public class CodeGenerator implements ASTVisitor {
             if (node.getBody() != null) {
                 // Collect all local variables from variable declarations
                 collectLocalVariables(node.getBody());
-                // Generate local variable declarations (skip parameters)
+                // Generate local variable declarations (skip parameters) and deduplicate by name
+                java.util.Set<String> emitted = new java.util.HashSet<>();
                 for (VariableScopeManager.VariableInfo local : scopeManager.getFunctionLocals()) {
-                    if (local.localIndex >= node.getParameters().size()) { // Skip parameters
+                    if (local.localIndex >= node.getParameters().size() && emitted.add(local.name)) { // Skip parameters
                         writer.writeLine(String.format("(local $%s %s)", local.name, local.wasmType));
                     }
                 }
                 // Generate function body
                 node.getBody().accept(this);
+
+                // Ensure there is always a return for functions with a result type,
+                // even if control reaches the end without executing an explicit return.
+                if (node.getReturnType() != null) {
+                    Type retType = typeFromNode(node.getReturnType());
+                    if (retType == Type.REAL) {
+                        writer.writeLine("(f64.const 0.0)");
+                    } else {
+                        // INTEGER, BOOLEAN and default fallback use i32
+                        writer.writeLine("(i32.const 0)");
+                    }
+                    writer.writeLine("(return)");
+                }
             } else {
                 // Forward declaration - no body
                 // Just close the function declaration
@@ -573,16 +684,22 @@ public class CodeGenerator implements ASTVisitor {
     @Override
     public void visit(UnaryExpressionNode node) {
         try {
-            node.getOperand().accept(this);
-
-            String instruction = switch(node.getOperator()) {
-                case MINUS -> "i32.neg";
-                case NOT -> "i32.eqz";
-                default -> "";
-            };
-
-            if (!instruction.isEmpty()) {
-                writer.writeLine("(" + instruction + ")");
+            if (node.getOperator() == UnaryExpressionNode.Operator.MINUS) {
+                // Unary minus: handle integer vs real separately
+                Type operandType = typeResolver.resolveType(node.getOperand());
+                if (operandType == Type.REAL) {
+                    // f64.neg is a native WebAssembly instruction
+                    node.getOperand().accept(this);
+                    writer.writeLine("(f64.neg)");
+                } else {
+                    // No i32.neg in WebAssembly; implement as (0 - x)
+                    writer.writeLine("(i32.const 0)");
+                    node.getOperand().accept(this);
+                    writer.writeLine("(i32.sub)");
+                }
+            } else if (node.getOperator() == UnaryExpressionNode.Operator.NOT) {
+                node.getOperand().accept(this);
+                writer.writeLine("(i32.eqz)");
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -612,17 +729,13 @@ public class CodeGenerator implements ASTVisitor {
     @Override
     public void visit(IdentifierNode node) {
         try {
-            VariableScopeManager.VariableInfo var = scopeManager.lookupVariable(node.getName());
-            if (var != null) {
-                writer.writeLine("(local.get $" + node.getName() + ")");
-                // Set expression type based on variable type
-                if ("f64".equals(var.wasmType)) {
-                    currentExpressionType = Type.REAL;
-                } else if ("i32".equals(var.wasmType)) {
-                    // Could be integer or boolean, but for now assume integer
-                    currentExpressionType = Type.INTEGER;
-                }
-            }
+            // Always treat identifiers as locals; the set of locals is determined
+            // by collectLocalVariables, and we rely on the name here.
+            writer.writeLine("(local.get $" + node.getName() + ")");
+
+            // Determine the expression type using the type resolver
+            Type exprType = typeResolver.resolveType(node);
+            currentExpressionType = exprType;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -648,14 +761,21 @@ public class CodeGenerator implements ASTVisitor {
     @Override
     public void visit(RecordAccessNode node) {
         try {
-            // Calculate field offset in record
+            // Calculate address of the field within its containing record
             visitRecordAccessForStore(node);
 
-            // Load field value
-            writer.writeLine("(i32.load)");
-
-            // Set expression type (assume integer for now)
-            currentExpressionType = Type.INTEGER;
+            // Decide whether to treat this access as a pointer (nested record)
+            // or as a scalar value that must be loaded.
+            ASTNode fieldTypeAst = resolveFieldTypeAst(node);
+            if (fieldTypeAst != null && isRecordTypeAst(fieldTypeAst)) {
+                // Nested record field: expression value is a pointer to the
+                // inlined record; leave address on the stack without loading.
+                currentExpressionType = Type.INTEGER; // pointers are i32
+            } else {
+                // Primitive or non-record field: load the stored value.
+                writer.writeLine("(i32.load)");
+                currentExpressionType = Type.INTEGER;
+            }
 
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -663,10 +783,25 @@ public class CodeGenerator implements ASTVisitor {
     }
 
     private void visitRecordAccessForStore(RecordAccessNode node) throws IOException {
-        // Get record reference
-        node.getObject().accept(this);
+        // Get base address of the record
+        ASTNode object = node.getObject();
+        if (object instanceof ArrayAccessNode) {
+            // For arrays of records, generate address of the record element
+            visitArrayAccessForStore((ArrayAccessNode) object);
+        } else if (object instanceof RecordAccessNode) {
+            // Nested record access, e.g. john.home.street or p.job.salary.
+            // Recursively compute the base address of the inner record without
+            // loading from memory, so that nested records are treated as inlined
+            // inside their parent record.
+            visitRecordAccessForStore((RecordAccessNode) object);
+        } else {
+            // For standalone record variables (p.x), the identifier already holds
+            // a pointer to the record, so expression evaluation gives us the base
+            // address directly.
+            object.accept(this);
+        }
 
-        // Calculate field offset
+        // Calculate field offset within the resolved record type
         int fieldOffset = calculateFieldOffset(node);
         writer.writeLine("(i32.const " + fieldOffset + ")");
 
@@ -674,13 +809,123 @@ public class CodeGenerator implements ASTVisitor {
         writer.writeLine("(i32.add)");
     }
 
-    private int calculateFieldOffset(RecordAccessNode node) {
-        // TODO: Implement proper field offset calculation based on record type
-        // For now, assume fields are at fixed offsets
+    private RecordTypeNode resolveRecordTypeFromAst(ASTNode typeNode) {
+        // Direct record type
+        if (typeNode instanceof RecordTypeNode) {
+            return (RecordTypeNode) typeNode;
+        }
+
+        // Type alias to a record
+        if (typeNode instanceof TypeReferenceNode) {
+            TypeReferenceNode ref = (TypeReferenceNode) typeNode;
+            ASTNode aliased = typeEnvironment.resolveType(ref.getName());
+            if (aliased != null) {
+                return resolveRecordTypeFromAst(aliased);
+            }
+        }
+
+        // Array element type may itself be a record or alias
+        if (typeNode instanceof ArrayTypeNode) {
+            ArrayTypeNode arr = (ArrayTypeNode) typeNode;
+            return resolveRecordTypeFromAst(arr.getElementType());
+        }
+
+        return null;
+    }
+
+    /** Resolve the declared type AST of the field referenced by a RecordAccessNode. */
+    private ASTNode resolveFieldTypeAst(RecordAccessNode node) {
+        RecordTypeNode recordType = resolveRecordTypeForObject(node.getObject());
+        if (recordType == null || recordType.getFields() == null) {
+            return null;
+        }
+
         String fieldName = node.getFieldName();
-        // Simple mapping: assume field order corresponds to declaration order
-        // This is a placeholder - proper implementation needs record type analysis
-        return 0; // First field at offset 0
+        for (VariableDeclarationNode field : recordType.getFields()) {
+            if (field.getName().equals(fieldName)) {
+                return field.getType();
+            }
+        }
+        return null;
+    }
+
+    /** Check whether a type AST (possibly a type alias) denotes a record type (but not arrays). */
+    private boolean isRecordTypeAst(ASTNode typeAst) {
+        if (typeAst instanceof RecordTypeNode) {
+            return true;
+        }
+        if (typeAst instanceof TypeReferenceNode) {
+            TypeReferenceNode ref = (TypeReferenceNode) typeAst;
+            ASTNode aliased = typeEnvironment.resolveType(ref.getName());
+            if (aliased != null) {
+                return isRecordTypeAst(aliased);
+            }
+        }
+        return false;
+    }
+
+    private int calculateFieldOffset(RecordAccessNode node) {
+        // Determine the record type that this field access is applied to
+        RecordTypeNode recordType = resolveRecordTypeForObject(node.getObject());
+        if (recordType == null) {
+            return 0;
+        }
+
+        String fieldName = node.getFieldName();
+        int offset = 0;
+
+        if (recordType.getFields() != null) {
+            for (VariableDeclarationNode field : recordType.getFields()) {
+                if (field.getName().equals(fieldName)) {
+                    return offset;
+                }
+                // Accumulate size of preceding fields
+                offset += sizeOfTypeAst(field.getType());
+            }
+        }
+
+        return offset;
+    }
+
+    /**
+     * Resolve the concrete RecordTypeNode for the given object expression used
+     * as the base of a RecordAccessNode. Handles simple identifiers, array
+     * elements of record type, and nested record accesses.
+     */
+    private RecordTypeNode resolveRecordTypeForObject(ASTNode object) {
+        if (object instanceof IdentifierNode) {
+            String name = ((IdentifierNode) object).getName();
+            ASTNode typeAst = variableTypeAsts.get(name);
+            if (typeAst != null) {
+                return resolveRecordTypeFromAst(typeAst);
+            }
+        } else if (object instanceof ArrayAccessNode) {
+            ArrayAccessNode arrayAccess = (ArrayAccessNode) object;
+            ASTNode arrayExpr = arrayAccess.getArray();
+            if (arrayExpr instanceof IdentifierNode) {
+                String arrayName = ((IdentifierNode) arrayExpr).getName();
+                ASTNode arrayTypeAst = variableTypeAsts.get(arrayName);
+                if (arrayTypeAst instanceof ArrayTypeNode) {
+                    ArrayTypeNode arrayType = (ArrayTypeNode) arrayTypeAst;
+                    return resolveRecordTypeFromAst(arrayType.getElementType());
+                }
+            }
+        } else if (object instanceof RecordAccessNode) {
+            // Nested record access: first resolve the outer record type, then
+            // look up the field type and resolve that to a record type.
+            RecordAccessNode recObj = (RecordAccessNode) object;
+            RecordTypeNode outerRecord = resolveRecordTypeForObject(recObj.getObject());
+            if (outerRecord != null && outerRecord.getFields() != null) {
+                String outerFieldName = recObj.getFieldName();
+                for (VariableDeclarationNode field : outerRecord.getFields()) {
+                    if (field.getName().equals(outerFieldName)) {
+                        return resolveRecordTypeFromAst(field.getType());
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     @Override
@@ -702,31 +947,41 @@ public class CodeGenerator implements ASTVisitor {
             Type targetType = getExpressionType(node.getTarget());
             Type sourceType = getExpressionType(node.getValue());
 
-            node.getValue().accept(this); // Generate value first
-
-            // Apply type conversion if needed
-            if (targetType != sourceType) {
-                generateTypeConversion(sourceType, targetType);
-            }
-
             if (node.getTarget() instanceof IdentifierNode) {
+                // Simple variable assignment: evaluate value, convert if needed, then set local
+                node.getValue().accept(this);
+                if (targetType != sourceType) {
+                    generateTypeConversion(sourceType, targetType);
+                }
                 IdentifierNode id = (IdentifierNode) node.getTarget();
                 writer.writeLine("(local.set $" + id.getName() + ")");
             } else if (node.getTarget() instanceof ArrayAccessNode) {
-                // Array element assignment
+                // Array element assignment: address must be below value on the stack
                 ArrayAccessNode arrayAccess = (ArrayAccessNode) node.getTarget();
 
-                // Generate array address calculation (this will leave address on stack)
+                // 1) Generate address of the array element (leaves address on stack)
                 visitArrayAccessForStore(arrayAccess);
 
-                // Store value (which is already on stack) to the address
+                // 2) Generate value
+                node.getValue().accept(this);
+                if (targetType != sourceType) {
+                    generateTypeConversion(sourceType, targetType);
+                }
+
+                // Stack order for i32.store: [..., address, value]
                 writer.writeLine("(i32.store)");
             } else if (node.getTarget() instanceof RecordAccessNode) {
-                // Record field assignment
+                // Record field assignment: address must be below value on the stack
                 RecordAccessNode recordAccess = (RecordAccessNode) node.getTarget();
 
-                // Generate record field address calculation
+                // 1) Generate address of the record field
                 visitRecordAccessForStore(recordAccess);
+
+                // 2) Generate value
+                node.getValue().accept(this);
+                if (targetType != sourceType) {
+                    generateTypeConversion(sourceType, targetType);
+                }
 
                 // Store value to the calculated address
                 writer.writeLine("(i32.store)");
@@ -781,6 +1036,16 @@ public class CodeGenerator implements ASTVisitor {
     }
 
     private void visitArrayAccessForStore(ArrayAccessNode node) throws IOException {
+        // Handle multi-dimensional arrays (array-of-arrays) via flattened indexing
+        // when we have a pattern like A[i][j].
+        if (node.getArray() instanceof ArrayAccessNode) {
+            if (generateFlattenedTwoDimArrayAddress(node)) {
+                return;
+            }
+            // If we couldn't recognize a 2D array pattern, fall back to 1D behavior.
+        }
+
+        // 1D array access: base + index * element_size
         // Get array reference
         node.getArray().accept(this);
 
@@ -789,8 +1054,9 @@ public class CodeGenerator implements ASTVisitor {
         writer.writeLine("(i32.const 1)");
         writer.writeLine("(i32.sub)"); // Convert to 0-based indexing
 
-        // Element size (assume 4 bytes for i32)
-        writer.writeLine("(i32.const 4)");
+        // Element size in bytes (may be a record size, not always 4)
+        int elementSize = resolveArrayElementSize(node);
+        writer.writeLine("(i32.const " + elementSize + ")");
         writer.writeLine("(i32.mul)"); // index * element_size
 
         // Add base address
@@ -799,12 +1065,134 @@ public class CodeGenerator implements ASTVisitor {
 
     private int calculateRecordSize(RecordTypeNode recordType) {
         int totalSize = 0;
-        // For now, assume each field is 4 bytes (i32)
-        // TODO: Calculate actual size based on field types
         if (recordType.getFields() != null) {
-            totalSize = recordType.getFields().size() * 4;
+            for (VariableDeclarationNode field : recordType.getFields()) {
+                totalSize += sizeOfTypeAst(field.getType());
+            }
         }
         return totalSize;
+    }
+
+    /** Return the size in bytes of a type described by its AST node. */
+    private int sizeOfTypeAst(ASTNode typeAst) {
+        if (typeAst instanceof PrimitiveTypeNode) {
+            // All primitive scalar types are stored as i32 / f64, but in records we
+            // represent them uniformly as 4-byte slots.
+            return 4;
+        }
+        if (typeAst instanceof TypeReferenceNode) {
+            TypeReferenceNode ref = (TypeReferenceNode) typeAst;
+            ASTNode aliased = typeEnvironment.resolveType(ref.getName());
+            if (aliased != null) {
+                return sizeOfTypeAst(aliased);
+            }
+            return 4;
+        }
+        if (typeAst instanceof RecordTypeNode) {
+            // Inline record size
+            return calculateRecordSize((RecordTypeNode) typeAst);
+        }
+        if (typeAst instanceof ArrayTypeNode) {
+            // Arrays are represented as pointers
+            return 4;
+        }
+        // Fallback: treat as pointer-sized
+        return 4;
+    }
+
+    /** Compute the element size in bytes for a given array type. */
+    private int getArrayElementSize(ArrayTypeNode arrayType) {
+        ASTNode elementType = arrayType.getElementType();
+        if (elementType instanceof ArrayTypeNode) {
+            // For array-of-arrays, treat each element as an inlined row of the inner
+            // array rather than a pointer, so that 2D arrays are flattened in memory.
+            ArrayTypeNode inner = (ArrayTypeNode) elementType;
+            int cols = getFixedArrayLength(inner);
+            int elemSize = sizeOfTypeAst(inner.getElementType());
+            return cols * elemSize;
+        }
+        return sizeOfTypeAst(elementType);
+    }
+
+    /** Resolve the element size for an ArrayAccess node based on the array variable type. */
+    private int resolveArrayElementSize(ArrayAccessNode node) {
+        ASTNode arrayExpr = node.getArray();
+        if (arrayExpr instanceof IdentifierNode) {
+            String name = ((IdentifierNode) arrayExpr).getName();
+            ASTNode typeAst = variableTypeAsts.get(name);
+            if (typeAst instanceof ArrayTypeNode) {
+                return getArrayElementSize((ArrayTypeNode) typeAst);
+            }
+        }
+        // Default element size (i32)
+        return 4;
+    }
+
+    /**
+     * Attempt to generate a flattened 2D address for an ArrayAccessNode of the
+     * form A[i][j], where A is declared as array [R] array [C] T. The resulting
+     * address is: base(A) + ((i-1) * C + (j-1)) * sizeof(T).
+     *
+     * Returns true if the pattern was recognized and code was emitted, false
+     * otherwise (in which case the caller should fall back to 1D logic).
+     */
+    private boolean generateFlattenedTwoDimArrayAddress(ArrayAccessNode node) throws IOException {
+        ArrayAccessNode inner = (ArrayAccessNode) node.getArray();
+        ASTNode baseExpr = inner.getArray();
+        if (!(baseExpr instanceof IdentifierNode)) {
+            return false;
+        }
+
+        String baseName = ((IdentifierNode) baseExpr).getName();
+        ASTNode typeAst = variableTypeAsts.get(baseName);
+        if (!(typeAst instanceof ArrayTypeNode)) {
+            return false;
+        }
+
+        ArrayTypeNode outerType = (ArrayTypeNode) typeAst;
+        if (!(outerType.getElementType() instanceof ArrayTypeNode)) {
+            return false;
+        }
+
+        ArrayTypeNode innerType = (ArrayTypeNode) outerType.getElementType();
+        int cols = getFixedArrayLength(innerType);
+        int elemSize = sizeOfTypeAst(innerType.getElementType());
+
+        // Compute ((i-1) * cols + (j-1)) * elemSize
+        // i index (from inner access A[i])
+        inner.getIndex().accept(this);
+        writer.writeLine("(i32.const 1)");
+        writer.writeLine("(i32.sub)"); // i - 1
+        writer.writeLine("(i32.const " + cols + ")");
+        writer.writeLine("(i32.mul)"); // (i-1) * cols
+
+        // j index (from outer access [j])
+        node.getIndex().accept(this);
+        writer.writeLine("(i32.const 1)");
+        writer.writeLine("(i32.sub)"); // j - 1
+        writer.writeLine("(i32.add)"); // (i-1)*cols + (j-1)
+
+        writer.writeLine("(i32.const " + elemSize + ")");
+        writer.writeLine("(i32.mul)"); // offset in bytes
+
+        // Add base pointer. Order (offset, base) is fine because addition is
+        // commutative.
+        writer.writeLine("(local.get $" + baseName + ")");
+        writer.writeLine("(i32.add)");
+        return true;
+    }
+
+    /** Extract constant length from a fixed-size ArrayTypeNode; fallback to 1. */
+    private int getFixedArrayLength(ArrayTypeNode arrayType) {
+        if (arrayType.getSizeExpression() instanceof LiteralNode) {
+            LiteralNode lit = (LiteralNode) arrayType.getSizeExpression();
+            Object v = lit.getValue();
+            if (v instanceof Number) {
+                return ((Number) v).intValue();
+            }
+        }
+        // Fallback for non-constant or unsupported sizes
+        return 1;
     }
 
     @Override
@@ -812,7 +1200,8 @@ public class CodeGenerator implements ASTVisitor {
         try {
             node.getCondition().accept(this);
             writer.writeLine(";; If statement");
-            writer.writeLine("(if (result i32)");
+            // If-statement is a pure statement, not an expression: no result value on stack
+            writer.writeLine("(if");
             writer.indent();
             writer.writeLine("(then");
             writer.indent();
@@ -830,9 +1219,6 @@ public class CodeGenerator implements ASTVisitor {
                 scopeManager.exitScope();
                 writer.dedent();
                 writer.writeLine(")");
-            } else {
-                // WAT requires else block when if returns a result
-                writer.writeLine("(else (i32.const 0))");
             }
 
             writer.dedent();
@@ -891,13 +1277,15 @@ public class CodeGenerator implements ASTVisitor {
         String loopVar = node.getVariable();
         boolean reverse = node.isReverse();
 
+        Integer arrayLength = getArrayLengthForArrayExpr(node.getArrayExpr());
+        int lengthConst = (arrayLength != null ? arrayLength : 5);
+
         writer.writeLine(";; For loop over array");
         // Initialize index
         if (reverse) {
-            // TODO: Get array length and start from end
-            writer.writeLine("(i32.const 5)"); // Assume array size 5 for now
+            writer.writeLine("(i32.const " + lengthConst + ")");
         } else {
-            writer.writeLine("(i32.const 1)"); // Start from 1 (1-based indexing)
+            writer.writeLine("(i32.const 1)");
         }
         writer.writeLine("(local.set $" + loopVar + "_index)");
 
@@ -914,7 +1302,7 @@ public class CodeGenerator implements ASTVisitor {
             writer.writeLine("(br_if $break)");
         } else {
             writer.writeLine("(local.get $" + loopVar + "_index)");
-            writer.writeLine("(i32.const 5)"); // Assume array size 5 for now
+            writer.writeLine("(i32.const " + lengthConst + ")");
             writer.writeLine("(i32.gt_s)");
             writer.writeLine("(br_if $break)");
         }
@@ -953,8 +1341,13 @@ public class CodeGenerator implements ASTVisitor {
 
     private void generateRangeIteration(ForLoopNode node) throws IOException {
         if (node.getRangeStart() != null) {
-            // Initialize the loop variable
-            node.getRangeStart().accept(this);
+            boolean reverse = node.isReverse();
+
+            if (reverse) {
+                node.getRangeEnd().accept(this);
+            } else {
+                node.getRangeStart().accept(this);
+            }
             writer.writeLine("(local.set $" + node.getVariable() + ")");
 
             writer.writeLine(";; For loop range");
@@ -963,9 +1356,14 @@ public class CodeGenerator implements ASTVisitor {
             writer.writeLine("(loop $continue");
             writer.indent();
 
-            node.getRangeEnd().accept(this);
             writer.writeLine("(local.get $" + node.getVariable() + ")");
-            writer.writeLine("(i32.gt_s)");
+            if (reverse) {
+                node.getRangeStart().accept(this);
+                writer.writeLine("(i32.lt_s)");
+            } else {
+                node.getRangeEnd().accept(this);
+                writer.writeLine("(i32.gt_s)");
+            }
             writer.writeLine("(br_if $break)");
 
             scopeManager.enterScope();
@@ -974,7 +1372,11 @@ public class CodeGenerator implements ASTVisitor {
 
             writer.writeLine("(local.get $" + node.getVariable() + ")");
             writer.writeLine("(i32.const 1)");
-            writer.writeLine("(i32.add)");
+            if (reverse) {
+                writer.writeLine("(i32.sub)");
+            } else {
+                writer.writeLine("(i32.add)");
+            }
             writer.writeLine("(local.set $" + node.getVariable() + ")");
             writer.writeLine("(br $continue)");
 
@@ -985,24 +1387,68 @@ public class CodeGenerator implements ASTVisitor {
         }
     }
 
+    private Integer getArrayLengthForArrayExpr(ASTNode arrayExpr) {
+        if (arrayExpr instanceof IdentifierNode) {
+            String name = ((IdentifierNode) arrayExpr).getName();
+            ASTNode typeAst = variableTypeAsts.get(name);
+            if (typeAst instanceof ArrayTypeNode) {
+                ArrayTypeNode arrayType = (ArrayTypeNode) typeAst;
+                ASTNode sizeExpr = arrayType.getSizeExpression();
+                if (sizeExpr instanceof LiteralNode) {
+                    Object value = ((LiteralNode) sizeExpr).getValue();
+                    if (value instanceof Number) {
+                        return ((Number) value).intValue();
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     @Override
     public void visit(ReturnStatementNode node) {
-        if (node.getValue() != null) {
-            node.getValue().accept(this);
+        try {
+            if (node.getValue() != null) {
+                node.getValue().accept(this);
+            }
+            // Explicit return ensures correct control flow and stack discipline
+            writer.writeLine("(return)");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
-        // In WAT, functions with result type implicitly return the top stack value
-        // No explicit return needed
     }
 
     @Override
     public void visit(PrintStatementNode node) {
         try {
-            for (ASTNode expr : node.getExpressions()) {
+            java.util.List<ASTNode> exprs = node.getExpressions();
+            int count = exprs.size();
+
+            for (int idx = 0; idx < count; idx++) {
+                ASTNode expr = exprs.get(idx);
                 expr.accept(this);
-                // Determine type and call appropriate print function
-                // For now, assume all are integers
-                writer.writeLine("(call $print_int)");
+
+                // Determine type and call appropriate print function for this expression
+                Type exprType = typeResolver.resolveType(expr);
+                if (exprType == Type.REAL) {
+                    writer.writeLine("(call $print_real)");
+                } else if (exprType == Type.BOOLEAN) {
+                    writer.writeLine("(call $print_bool)");
+                } else {
+                    // Default and integers
+                    writer.writeLine("(call $print_int)");
+                }
+
+                // Separate multiple arguments in a single print statement with a space
+                if (idx < count - 1) {
+                    writer.writeLine("(i32.const 32)"); // ' '
+                    writer.writeLine("(call $print_char)");
+                }
             }
+
+            // Each print statement ends with a newline
+            writer.writeLine("(i32.const 10)"); // '\n'
+            writer.writeLine("(call $print_char)");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

@@ -104,12 +104,8 @@ auto-save-list
 tramp
 .\#*
 
-# Test files
-test_simple.i
-
 # Temporary files
 *.tmp
 *.temp
 
-
-*.md
+# *.md

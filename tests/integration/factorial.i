@@ -8,4 +8,4 @@ is
 end
 
 var result : integer is factorial(5)
-// Result is tested by successful execution
+print result

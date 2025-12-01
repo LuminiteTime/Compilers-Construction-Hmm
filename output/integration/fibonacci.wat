@@ -1,7 +1,7 @@
 (module
   (import "wasi_snapshot_preview1" "fd_write" (func $fd_write (param i32 i32 i32 i32) (result i32)))
   (import "wasi_snapshot_preview1" "proc_exit" (func $proc_exit (param i32)))
-  (memory 1)
+  (memory (export "memory") 1)
   (data (i32.const 1024) "\00\00\00\00\00\00\00\00")
   (data (i32.const 2048) "\00\00\00\00\00\00\00\00")
   (global $heap_ptr (mut i32) (i32.const 0))
@@ -13,9 +13,10 @@
     (i32.const 1)
     (i32.le_s)
     ;; If statement
-    (if (result i32)
+    (if
       (then
         (local.get $n)
+        (return)
       )
       (else
         (local.get $n)
@@ -27,8 +28,11 @@
         (i32.sub)
         (call $fibonacci)
         (i32.add)
+        (return)
       )
     )
+    (i32.const 0)
+    (return)
   )
   ;; Main entry point
   (func $_start
@@ -37,10 +41,13 @@
     (i32.const 10)
     (call $fibonacci)
     (local.set $fib10)
-    (local.get $fib10)
+    (i32.const 0)
     (call $proc_exit)
   )
+  (export "_start" (func $_start))
   (func $print_int (param $val i32)
+    (call $int_to_string (local.get $val))
+    (call $write_string)
   )
   (func $print_real (param $val f64)
     (i32.trunc_f64_s (local.get $val))
@@ -73,6 +80,7 @@
       )
     )
     (call $reverse_string (i32.const 1024) (local.get $digits))
+    (i32.store8 (i32.add (i32.const 1024) (local.get $digits)) (i32.const 0))
   )
   (func $reverse_string (param $ptr i32) (param $len i32)
     (local $i i32)
@@ -106,6 +114,11 @@
       (i32.const 0)
     )
     (drop)
+  )
+  (func $print_char (param $ch i32)
+    (i32.store8 (i32.const 1024) (local.get $ch))
+    (i32.store8 (i32.add (i32.const 1024) (i32.const 1)) (i32.const 0))
+    (call $write_string)
   )
   (func $string_length (param $ptr i32) (result i32)
     (local $len i32)

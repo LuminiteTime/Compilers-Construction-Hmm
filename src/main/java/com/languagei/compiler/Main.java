@@ -38,22 +38,36 @@ public class Main {
 
                 case "run":
                     if (args.length < 2) {
-                        System.err.println("Usage: run <source.i> [-o output.wasm]");
+                        System.err.println("Usage: run <source.i> [-o output.wat]");
                         return;
                     }
                     sourceFile = args[1];
-                    String wasmFile = "output.wasm";
-                    
+                    String watFileArg = "output.wat";
+
                     for (int i = 2; i < args.length; i++) {
                         if ("-o".equals(args[i]) && i + 1 < args.length) {
-                            wasmFile = args[++i];
+                            watFileArg = args[++i];
                         }
                     }
-                    
+
                     compiler = new Compiler();
-                    String watFile = wasmFile.replace(".wasm", ".wat");
+                    String watFile = watFileArg;
                     compiler.compile(sourceFile, watFile);
-                    System.out.println("✓ Compiled to WAT");
+                    System.out.println("\u2713 Compiled to WAT");
+
+                    // After successful compilation, execute the generated WAT via wasmtime
+                    try {
+                        ProcessBuilder pb = new ProcessBuilder("wasmtime", watFile);
+                        pb.inheritIO();
+                        Process proc = pb.start();
+                        int exitCode = proc.waitFor();
+                        if (exitCode != 0) {
+                            System.err.println("\u2717 wasmtime exited with code " + exitCode);
+                            System.exit(exitCode);
+                        }
+                    } catch (IOException | InterruptedException e) {
+                        throw new RuntimeException("Failed to run wasmtime", e);
+                    }
                     break;
 
                 case "ast":
@@ -83,7 +97,7 @@ public class Main {
         System.out.println();
         System.out.println("Usage:");
         System.out.println("  java -jar compiler-i.jar compile <source.i> [-o output.wat]");
-        System.out.println("  java -jar compiler-i.jar run <source.i> [-o output.wasm]");
+        System.out.println("  java -jar compiler-i.jar run <source.i> [-o output.wat]");
         System.out.println("  java -jar compiler-i.jar ast <source.i>");
         System.out.println();
         System.out.println("Commands:");

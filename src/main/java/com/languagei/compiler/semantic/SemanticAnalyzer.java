@@ -10,10 +10,12 @@ public class SemanticAnalyzer implements ASTVisitor {
     private final SymbolTable symbolTable;
     private final List<CompilationError> errors;
     private Type currentExpressionType;
+    private final Deque<String> loopVariables;
 
     public SemanticAnalyzer() {
         this.symbolTable = new SymbolTable();
         this.errors = new ArrayList<>();
+        this.loopVariables = new ArrayDeque<>();
     }
 
     public void analyze(ProgramNode program) {
@@ -32,7 +34,10 @@ public class SemanticAnalyzer implements ASTVisitor {
                 symbolTable.declare(routine.getName(), new Symbol(routine.getName(), Symbol.Kind.FUNCTION, funcType));
             } else if (decl instanceof TypeDeclarationNode) {
                 TypeDeclarationNode typeDecl = (TypeDeclarationNode) decl;
-                // Will handle type creation properly
+                // Declare type aliases up front so TypeReferenceNode lookups succeed
+                Type type = typeFromNode(typeDecl.getType());
+                symbolTable.declare(typeDecl.getName(),
+                    new Symbol(typeDecl.getName(), Symbol.Kind.TYPE, type));
             }
         }
 
@@ -134,8 +139,7 @@ public class SemanticAnalyzer implements ASTVisitor {
 
     @Override
     public void visit(TypeDeclarationNode node) {
-        Type type = typeFromNode(node.getType());
-        symbolTable.declare(node.getName(), new Symbol(node.getName(), Symbol.Kind.TYPE, type));
+        // Types are declared during the initial analyze() pass; nothing to do here.
     }
 
     @Override
@@ -257,6 +261,11 @@ public class SemanticAnalyzer implements ASTVisitor {
     public void visit(IdentifierNode node) {
         Symbol sym = symbolTable.lookup(node.getName());
         if (sym == null) {
+            // If the name matches an active for-loop variable, treat it as integer
+            if (loopVariables.contains(node.getName())) {
+                currentExpressionType = Type.INTEGER;
+                return;
+            }
             addError(node.getPosition(), "Undefined variable: " + node.getName());
             currentExpressionType = Type.VOID;
         } else {
@@ -382,33 +391,35 @@ public class SemanticAnalyzer implements ASTVisitor {
 
     @Override
     public void visit(ForLoopNode node) {
-        // Create scope for loop variable and body
-        symbolTable.enterScope();
+        // Track loop variable explicitly to guarantee its visibility inside the loop body
+        loopVariables.push(node.getVariable());
+        try {
+            // Loop variable is implicitly declared in the current scope
+            symbolTable.declare(node.getVariable(), new Symbol(node.getVariable(), Symbol.Kind.VARIABLE, Type.INTEGER));
 
-        // Loop variable is implicitly declared
-        symbolTable.declare(node.getVariable(), new Symbol(node.getVariable(), Symbol.Kind.VARIABLE, Type.INTEGER));
+            // Validate range expressions
+            if (node.getRangeStart() != null && node.getRangeEnd() != null) {
+                node.getRangeStart().accept(this);
+                if (currentExpressionType != Type.INTEGER) {
+                    addError(node.getPosition(), "Range start must be integer");
+                }
 
-        // Validate range expressions
-        if (node.getRangeStart() != null && node.getRangeEnd() != null) {
-            node.getRangeStart().accept(this);
-            if (currentExpressionType != Type.INTEGER) {
-                addError(node.getPosition(), "Range start must be integer");
+                node.getRangeEnd().accept(this);
+                if (currentExpressionType != Type.INTEGER) {
+                    addError(node.getPosition(), "Range end must be integer");
+                }
+            } else if (node.getArrayExpr() != null) {
+                node.getArrayExpr().accept(this);
+                if (!(currentExpressionType instanceof Type.ArrayType)) {
+                    addError(node.getPosition(), "For loop array expression must be array type");
+                }
             }
 
-            node.getRangeEnd().accept(this);
-            if (currentExpressionType != Type.INTEGER) {
-                addError(node.getPosition(), "Range end must be integer");
-            }
-        } else if (node.getArrayExpr() != null) {
-            node.getArrayExpr().accept(this);
-            if (!(currentExpressionType instanceof Type.ArrayType)) {
-                addError(node.getPosition(), "For loop array expression must be array type");
-            }
+            // Body already manages its own scope via BlockNode
+            node.getBody().accept(this);
+        } finally {
+            loopVariables.pop();
         }
-
-        node.getBody().accept(this);
-
-        symbolTable.exitScope();
     }
 
     @Override
@@ -439,6 +450,17 @@ public class SemanticAnalyzer implements ASTVisitor {
             return true;
         }
         
+        // Arrays: allow sizeless array parameters to accept fixed-size arrays
+        if (target instanceof Type.ArrayType && source instanceof Type.ArrayType) {
+            Type.ArrayType tArr = (Type.ArrayType) target;
+            Type.ArrayType sArr = (Type.ArrayType) source;
+            if (tArr.getElementType().equals(sArr.getElementType())) {
+                if (tArr.getSize() == null && sArr.getSize() != null) {
+                    return true;
+                }
+            }
+        }
+
         // Integer can receive from integer
         if (target == Type.INTEGER && source == Type.INTEGER) return true;
         

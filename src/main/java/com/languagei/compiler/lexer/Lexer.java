@@ -51,16 +51,25 @@ public class Lexer {
             case ';': advance(); return makeToken(TokenType.SEMICOLON, ";");
             case '+': advance(); return makeToken(TokenType.PLUS, "+");
             case '*': advance(); return makeToken(TokenType.STAR, "*");
-            case '/': advance(); return makeToken(TokenType.SLASH, "/");
             case '%': advance(); return makeToken(TokenType.PERCENT, "%");
         }
 
         // Multi-character operators
-        if (c == '-') {
+        // Arrow '=>' (short function body). Also accept legacy '->' if present.
+        if (c == '=') {
             advance();
             if (peek() == '>') {
                 advance();
                 return makeToken(TokenType.ARROW, "=>");
+            }
+            return makeToken(TokenType.EQ, "=");
+        }
+
+        if (c == '-') {
+            advance();
+            if (peek() == '>') {
+                advance();
+                return makeToken(TokenType.ARROW, "->");
             }
             return makeToken(TokenType.MINUS, "-");
         }
@@ -108,13 +117,10 @@ public class Lexer {
 
         if (c == '/') {
             advance();
-            if (peek() == '=') {
+            if (!isAtEnd() && peek() == '=') {
                 advance();
                 return makeToken(TokenType.NE, "/=");
             }
-            position--;
-            column--;
-            advance();
             return makeToken(TokenType.SLASH, "/");
         }
 
