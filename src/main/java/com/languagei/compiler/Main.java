@@ -1,5 +1,11 @@
 package com.languagei.compiler;
 
+import com.languagei.compiler.ast.ASTPrinter;
+import com.languagei.compiler.ast.ProgramNode;
+import com.languagei.compiler.lexer.Lexer;
+import com.languagei.compiler.lexer.Token;
+import com.languagei.compiler.lexer.TokenType;
+
 import java.io.IOException;
 
 /**
@@ -77,8 +83,26 @@ public class Main {
                     }
                     sourceFile = args[1];
                     compiler = new Compiler();
-                    var ast = compiler.compileToAST(sourceFile);
-                    System.out.println("AST: " + ast);
+                    ProgramNode ast = compiler.compileToOptimizedAST(sourceFile);
+                    ASTPrinter.print(ast);
+                    break;
+
+                case "tokens":
+                    if (args.length < 2) {
+                        System.err.println("Usage: tokens <source.i>");
+                        return;
+                    }
+                    sourceFile = args[1];
+                    try {
+                        Lexer lexer = Lexer.fromFile(sourceFile);
+                        while (true) {
+                            Token t = lexer.nextToken();
+                            System.out.println(t);
+                            if (t.getType() == TokenType.EOF) break;
+                        }
+                    } catch (IOException e) {
+                        throw new RuntimeException("Failed to lex file " + sourceFile, e);
+                    }
                     break;
 
                 default:
@@ -99,10 +123,12 @@ public class Main {
         System.out.println("  java -jar compiler-i.jar compile <source.i> [-o output.wat]");
         System.out.println("  java -jar compiler-i.jar run <source.i> [-o output.wat]");
         System.out.println("  java -jar compiler-i.jar ast <source.i>");
+        System.out.println("  java -jar compiler-i.jar tokens <source.i>");
         System.out.println();
         System.out.println("Commands:");
         System.out.println("  compile  Compile Language I source to WebAssembly Text format");
         System.out.println("  run      Compile and run a Language I program");
-        System.out.println("  ast      Display the Abstract Syntax Tree");
+        System.out.println("  ast      Display the optimized Abstract Syntax Tree");
+        System.out.println("  tokens   Display the token stream produced by the lexer");
     }
 }

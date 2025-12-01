@@ -5,6 +5,8 @@ import com.languagei.compiler.codegen.CodeGenerator;
 import com.languagei.compiler.lexer.Lexer;
 import com.languagei.compiler.parser.Parser;
 import com.languagei.compiler.semantic.CompilationError;
+import com.languagei.compiler.semantic.ConstantFolder;
+import com.languagei.compiler.semantic.DeadCodeEliminator;
 import com.languagei.compiler.semantic.SemanticAnalyzer;
 
 import java.io.*;
@@ -30,19 +32,12 @@ public class Compiler {
         return ast;
     }
 
-    public void compile(String sourceFile, String outputFile) throws IOException {
-        // Ensure output directory exists
-        java.io.File outputDir = new java.io.File("output");
-        if (!outputDir.exists()) {
-            outputDir.mkdirs();
-        }
-
-        // If outputFile doesn't contain path separators, put it in output directory
-        if (!outputFile.contains("/") && !outputFile.contains("\\")) {
-            outputFile = "output/" + outputFile;
-        }
-
-        // Parse
+    /**
+     * Parse, run semantic analysis, and apply optimization passes (constant
+     * folding and simple dead-code elimination). Returns the optimized AST
+     * ready for code generation or inspection.
+     */
+    public ProgramNode compileToOptimizedAST(String sourceFile) throws IOException {
         ProgramNode ast = compileToAST(sourceFile);
 
         // Semantic analysis
@@ -57,7 +52,32 @@ public class Compiler {
             throw new RuntimeException("Compilation failed due to semantic errors");
         }
 
-        // Code generation
+        // Optimization passes on AST
+        ConstantFolder constantFolder = new ConstantFolder();
+        ast = constantFolder.optimize(ast);
+
+        DeadCodeEliminator dce = new DeadCodeEliminator();
+        ast = dce.optimize(ast);
+
+        return ast;
+    }
+
+    public void compile(String sourceFile, String outputFile) throws IOException {
+        // Ensure output directory exists
+        java.io.File outputDir = new java.io.File("output");
+        if (!outputDir.exists()) {
+            outputDir.mkdirs();
+        }
+
+        // If outputFile doesn't contain path separators, put it in output directory
+        if (!outputFile.contains("/") && !outputFile.contains("\\")) {
+            outputFile = "output/" + outputFile;
+        }
+
+        // Parse, analyze and optimize AST
+        ProgramNode ast = compileToOptimizedAST(sourceFile);
+
+        // Code generation from optimized AST
         try (OutputStreamWriter osw = new OutputStreamWriter(
                 new FileOutputStream(outputFile), StandardCharsets.UTF_8)) {
             CodeGenerator codegen = new CodeGenerator(osw);
