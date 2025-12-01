@@ -11,6 +11,9 @@
     (param $y f64)
     (param $flag i32)
     (result i32)
+    (local $result1 i32)
+    (local $result2 i32)
+    (local $result3 i32)
     (local.get $flag)
     ;; If statement
     (if
@@ -34,6 +37,9 @@
     (param $b i32)
     (param $c i32)
     (result i32)
+    (local $result1 i32)
+    (local $result2 i32)
+    (local $result3 i32)
     (local.get $a)
     (local.get $b)
     (i32.mul)

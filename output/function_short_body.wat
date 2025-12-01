@@ -9,6 +9,8 @@
   (func $inc
     (param $x i32)
     (result i32)
+    (local $a i32)
+    (local $b i32)
     (local.get $x)
     (i32.const 1)
     (i32.add)

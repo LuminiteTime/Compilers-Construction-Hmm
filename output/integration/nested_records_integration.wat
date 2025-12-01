@@ -9,6 +9,8 @@
   (func $give_raise
     (param $p i32)
     (result i32)
+    (local $john i32)
+    (local $new_salary i32)
     (local.get $p)
     (i32.const 20)
     (i32.add)

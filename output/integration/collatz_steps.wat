@@ -9,6 +9,8 @@
   (func $collatz_steps
     (param $n i32)
     (result i32)
+    (local $c1 i32)
+    (local $c2 i32)
     (local $steps i32)
     (local $x i32)
     (i32.const 0)

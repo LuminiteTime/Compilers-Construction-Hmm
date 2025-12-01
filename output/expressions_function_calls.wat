@@ -9,6 +9,9 @@
   (func $double
     (param $x i32)
     (result i32)
+    (local $result1 i32)
+    (local $result2 i32)
+    (local $result3 i32)
     (local.get $x)
     (i32.const 2)
     (i32.mul)
@@ -20,6 +23,9 @@
   (func $is_even
     (param $n i32)
     (result i32)
+    (local $result1 i32)
+    (local $result2 i32)
+    (local $result3 i32)
     (local.get $n)
     (i32.const 2)
     (i32.rem_s)

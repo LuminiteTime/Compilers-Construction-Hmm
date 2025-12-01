@@ -9,6 +9,7 @@
   (func $fibonacci
     (param $n i32)
     (result i32)
+    (local $fib10 i32)
     (local.get $n)
     (i32.const 1)
     (i32.le_s)

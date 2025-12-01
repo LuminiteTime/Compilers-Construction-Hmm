@@ -10,6 +10,8 @@
     (param $a i32)
     (param $b i32)
     (result i32)
+    (local $g1 i32)
+    (local $g2 i32)
     (local $t i32)
     ;; While loop
     (block $break

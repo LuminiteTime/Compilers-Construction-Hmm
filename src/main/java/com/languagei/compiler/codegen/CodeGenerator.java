@@ -16,6 +16,14 @@ public class CodeGenerator implements ASTVisitor {
     private final FunctionEnvironment functionEnvironment;
     private final Map<String, RecordTypeNode> recordVarTypes;
     private final Map<String, ASTNode> variableTypeAsts;
+    // Track top-level (program-scope) variables and their wasm storage types
+    // so that functions can declare matching locals and refer to them without
+    // producing invalid WAT.
+    private final Map<String, String> globalVarWasmTypes;
+    // Track top-level variable declarations themselves so that we can
+    // re-use their initializers when initializing corresponding locals
+    // inside functions.
+    private final Map<String, VariableDeclarationNode> globalVarDecls;
     private String currentFunction;
     private final List<String> functions;
     private final StringBuilder functionDefs;
@@ -32,6 +40,8 @@ public class CodeGenerator implements ASTVisitor {
         this.functionDefs = new StringBuilder();
         this.recordVarTypes = new HashMap<>();
         this.variableTypeAsts = new HashMap<>();
+        this.globalVarWasmTypes = new LinkedHashMap<>();
+        this.globalVarDecls = new LinkedHashMap<>();
     }
 
     public void generate(ProgramNode program) throws IOException {
@@ -339,6 +349,23 @@ public class CodeGenerator implements ASTVisitor {
             }
         }
 
+        // Collect all top-level variable declarations and remember their
+        // effective wasm storage types and AST nodes. These will be used to
+        // declare matching locals inside each function so that references to
+        // top-level variables from within functions do not produce invalid
+        // WAT (unknown local errors), and to initialize those locals with the
+        // same initial values (for primitive types).
+        globalVarWasmTypes.clear();
+        globalVarDecls.clear();
+        for (ASTNode decl : node.getDeclarations()) {
+            if (decl instanceof VariableDeclarationNode) {
+                VariableDeclarationNode varDecl = (VariableDeclarationNode) decl;
+                String wasmType = getWasmTypeForVariable(varDecl);
+                globalVarWasmTypes.put(varDecl.getName(), wasmType);
+                globalVarDecls.put(varDecl.getName(), varDecl);
+            }
+        }
+
         // Collect all function declarations (forward and full)
         for (ASTNode decl : node.getDeclarations()) {
             if (decl instanceof RoutineDeclarationNode) {
@@ -524,6 +551,47 @@ public class CodeGenerator implements ASTVisitor {
         }
     }
 
+    /**
+     * Compute the effective WebAssembly storage type for a variable declaration.
+     * Arrays and records are represented as i32 pointers; primitive types are
+     * mapped via typeToWasm; otherwise, we fall back to type inference from the
+     * initializer or default to i32.
+     */
+    private String getWasmTypeForVariable(VariableDeclarationNode varDecl) {
+        String wasmType;
+        ASTNode resolvedType = varDecl.getType();
+
+        // Resolve type aliases
+        if (resolvedType instanceof TypeReferenceNode) {
+            TypeReferenceNode typeRef = (TypeReferenceNode) resolvedType;
+            ASTNode aliasedType = typeEnvironment.resolveType(typeRef.getName());
+            if (aliasedType != null) {
+                resolvedType = aliasedType;
+            }
+        }
+
+        if (resolvedType instanceof ArrayTypeNode) {
+            // Array type - store as pointer (i32)
+            wasmType = "i32";
+        } else if (resolvedType instanceof RecordTypeNode) {
+            // Record type - store as pointer (i32)
+            wasmType = "i32";
+        } else if (resolvedType != null) {
+            // Explicit non-array type
+            Type explicitType = typeFromNode(resolvedType);
+            wasmType = typeToWasm(explicitType);
+        } else if (varDecl.getInitializer() != null) {
+            // Type inference from initializer
+            Type inferredType = typeResolver.resolveType(varDecl.getInitializer());
+            wasmType = typeToWasm(inferredType);
+        } else {
+            // No type information - default to integer
+            wasmType = "i32";
+        }
+
+        return wasmType;
+    }
+
     private void collectLocalVariables(ASTNode node) {
         if (node instanceof VariableDeclarationNode) {
             VariableDeclarationNode varDecl = (VariableDeclarationNode) node;
@@ -651,6 +719,19 @@ public class CodeGenerator implements ASTVisitor {
                 }
             }
 
+            // Ensure all top-level (program-scope) variables are also declared
+            // as locals in this function so that references to them compile to
+            // valid `(local.get $name)` instructions. This matches the current
+            // code generation strategy where variables are modeled as locals
+            // rather than WebAssembly globals.
+            for (Map.Entry<String, String> entry : globalVarWasmTypes.entrySet()) {
+                String varName = entry.getKey();
+                String wasmType = entry.getValue();
+                if (scopeManager.lookupVariable(varName) == null) {
+                    scopeManager.declareVariable(varName, wasmType);
+                }
+            }
+
             // Return type
             if (node.getReturnType() != null) {
                 String wasmType = typeToWasm(typeFromNode(node.getReturnType()));
@@ -668,6 +749,35 @@ public class CodeGenerator implements ASTVisitor {
                         writer.writeLine(String.format("(local $%s %s)", local.name, local.wasmType));
                     }
                 }
+
+                // Initialize function-local copies of top-level variables that have
+                // simple literal initializers so that functions see the same
+                // starting values as at the top level. To avoid recursive code
+                // generation and potential stack overflows, we handle only
+                // LiteralNode initializers here and emit constants directly.
+                for (Map.Entry<String, VariableDeclarationNode> entry : globalVarDecls.entrySet()) {
+                    VariableDeclarationNode globalDecl = entry.getValue();
+                    if (!(globalDecl.getInitializer() instanceof LiteralNode)) {
+                        continue;
+                    }
+
+                    LiteralNode lit = (LiteralNode) globalDecl.getInitializer();
+                    Object value = lit.getValue();
+
+                    if (value instanceof Integer || value instanceof Long) {
+                        writer.writeLine("(i32.const " + value + ")");
+                    } else if (value instanceof Double || value instanceof Float) {
+                        writer.writeLine("(f64.const " + value + ")");
+                    } else if (value instanceof Boolean) {
+                        boolean b = (Boolean) value;
+                        writer.writeLine("(i32.const " + (b ? 1 : 0) + ")");
+                    } else {
+                        continue;
+                    }
+
+                    writer.writeLine("(local.set $" + globalDecl.getName() + ")");
+                }
+
                 // Generate function body
                 node.getBody().accept(this);
 

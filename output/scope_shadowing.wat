@@ -9,6 +9,9 @@
   (func $f
     (result i32)
     (local $x i32)
+    (local $y i32)
+    (i32.const 1)
+    (local.set $x)
     (i32.const 2)
     (local.set $x)
     (local.get $x)
