@@ -5,11 +5,6 @@ import com.languagei.compiler.lexer.Position;
 
 /**
  * Performs constant folding on the AST.
- *
- * This pass is purely semantic: it rewrites expression trees where all
- * operands are literals, replacing them with LiteralNode results. It does
- * not rely on the symbol table and is intended to run only after parsing
- * (and typically after successful semantic analysis).
  */
 public class ConstantFolder {
 

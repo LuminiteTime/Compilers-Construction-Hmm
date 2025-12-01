@@ -4,14 +4,6 @@ import com.languagei.compiler.ast.*;
 
 /**
  * Performs simple dead code elimination based on constant boolean conditions.
- *
- * Only the following transformations are performed, as described in TASK.md:
- * - if false then ... else ... end   => then-ветка выбрасывается, else остаётся
- * - if false then ... end           => весь if выбрасывается
- * - while false loop ... end        => цикл выбрасывается
- *
- * Условие считается ложным только если это LiteralNode с Boolean.FALSE,
- * что гарантируется предыдущим проходом constant folding.
  */
 public class DeadCodeEliminator {
 
