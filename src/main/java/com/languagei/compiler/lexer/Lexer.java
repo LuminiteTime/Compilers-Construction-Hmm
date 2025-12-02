@@ -55,7 +55,6 @@ public class Lexer {
         }
 
         // Multi-character operators
-        // Arrow '=>' (short function body). Also accept legacy '->' if present.
         if (c == '=') {
             advance();
             if (peek() == '>') {
