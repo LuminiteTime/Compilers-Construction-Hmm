@@ -16,12 +16,17 @@ var i : integer is 2
 while i <= 5 loop
   var key : integer is arr[i]
   var j : integer is i - 1
-  while j >= 1 loop
-    if arr[j] > key then
-      arr[j + 1] := arr[j]
-      j := j - 1
+  var done : boolean is false
+  while not done loop
+    if j < 1 then
+      done := true
     else
-      j := 0
+      if arr[j] > key then
+        arr[j + 1] := arr[j]
+        j := j - 1
+      else
+        done := true
+      end
     end
   end
   arr[j + 1] := key

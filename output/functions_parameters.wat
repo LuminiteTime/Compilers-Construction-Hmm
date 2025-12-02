@@ -4,7 +4,7 @@
   (memory (export "memory") 1)
   (data (i32.const 1024) "\00\00\00\00\00\00\00\00")
   (data (i32.const 2048) "\00\00\00\00\00\00\00\00")
-  (global $heap_ptr (mut i32) (i32.const 0))
+  (global $heap_ptr (mut i32) (i32.const 4096))
   ;; Function process_data
   (func $process_data
     (param $x i32)

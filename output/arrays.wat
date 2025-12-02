@@ -4,7 +4,7 @@
   (memory (export "memory") 1)
   (data (i32.const 1024) "\00\00\00\00\00\00\00\00")
   (data (i32.const 2048) "\00\00\00\00\00\00\00\00")
-  (global $heap_ptr (mut i32) (i32.const 0))
+  (global $heap_ptr (mut i32) (i32.const 4096))
   ;; Main entry point
   (func $_start
     ;; Local variables
@@ -19,6 +19,13 @@
     (i32.const 20)
     (call $allocate_array)
     (local.set $matrix)
+    (i32.const 1)
+    (i32.const 4)
+    (call $allocate_array)
+    (local.set $dynamic)
+    (local.get $dynamic)
+    (i32.const 0)
+    (i32.store)
     (i32.const 0)
     (call $proc_exit)
   )

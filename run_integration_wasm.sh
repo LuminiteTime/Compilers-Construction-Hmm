@@ -28,17 +28,6 @@ for file in $(find tests/integration -name "*.i" -type f | sort); do
   base=$(basename "$file" .i)
   wat="output/integration/${base}.wat"
 
-  case "$base" in
-    bubble_sort|bubble_sort_debug|bubble_sort_step_debug|bubble_swap_debug|\
-    insertion_sort|insertion_sort_step_debug|\
-    selection_sort|selection_sort_step_debug|\
-    gnome_sort|gnome_sort_step_debug)
-      printf "%-40s" "Running $base..."
-      echo "SKIPPED (sorting tests disabled)"
-      continue
-      ;;
-  esac
-
   printf "%-40s" "Running $base..."
 
   # First, compile to WAT only

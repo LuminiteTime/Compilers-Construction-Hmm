@@ -48,7 +48,10 @@ public class CodeGenerator implements ASTVisitor {
         writer.writeLine("(data (i32.const 1024) \"\\00\\00\\00\\00\\00\\00\\00\\00\")");
         writer.writeLine("(data (i32.const 2048) \"\\00\\00\\00\\00\\00\\00\\00\\00\")");
 
-        writer.writeLine("(global $heap_ptr (mut i32) (i32.const 0))");
+        // Start heap allocations above the runtime buffers (at address 4096) to
+        // avoid any interaction with low-memory regions that might be touched
+        // by the host environment.
+        writer.writeLine("(global $heap_ptr (mut i32) (i32.const 4096))");
 
         program.accept(this);
 
@@ -455,6 +458,24 @@ public class CodeGenerator implements ASTVisitor {
                     writer.writeLine("(i32.const " + elementSize + ")");
                     writer.writeLine("(call $allocate_array)");
                     writer.writeLine("(local.set $" + node.getName() + ")");
+                } else {
+                    // Unsized array variable (e.g., "array [] integer"). In the
+                    // language these are primarily intended for routine parameters,
+                    // but if they appear as variables we still need a well-defined
+                    // base pointer. Allocate space for a single element and
+                    // explicitly initialize that first element to 0 so that
+                    // expressions like b[1] read a defined value.
+                    writer.writeLine("(i32.const 1)");
+                    int elementSize = getArrayElementSize(arrayType);
+                    writer.writeLine("(i32.const " + elementSize + ")");
+                    writer.writeLine("(call $allocate_array)");
+                    writer.writeLine("(local.set $" + node.getName() + ")");
+
+                    // Initialize the first element (index 1) to 0: store 0 at the
+                    // base address pointed to by the local variable.
+                    writer.writeLine("(local.get $" + node.getName() + ")");
+                    writer.writeLine("(i32.const 0)");
+                    writer.writeLine("(i32.store)");
                 }
             } else if (resolvedTypeAst instanceof RecordTypeNode) {
                 // Record variable (including aliases to records) - allocate memory

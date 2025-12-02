@@ -26,6 +26,6 @@ while i <= 4 loop
 end
 
 // Print sorted array: 1 2 3 4 5
-for k in 1..5 loop
-  print arr[k]
+for o in 1..5 loop
+  print arr[o]
 end

@@ -4,7 +4,7 @@
   (memory (export "memory") 1)
   (data (i32.const 1024) "\00\00\00\00\00\00\00\00")
   (data (i32.const 2048) "\00\00\00\00\00\00\00\00")
-  (global $heap_ptr (mut i32) (i32.const 0))
+  (global $heap_ptr (mut i32) (i32.const 4096))
   ;; Function give_raise
   (func $give_raise
     (param $p i32)

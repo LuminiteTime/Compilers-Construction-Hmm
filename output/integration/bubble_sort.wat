@@ -4,7 +4,7 @@
   (memory (export "memory") 1)
   (data (i32.const 1024) "\00\00\00\00\00\00\00\00")
   (data (i32.const 2048) "\00\00\00\00\00\00\00\00")
-  (global $heap_ptr (mut i32) (i32.const 0))
+  (global $heap_ptr (mut i32) (i32.const 4096))
   ;; Main entry point
   (func $_start
     ;; Local variables
@@ -13,6 +13,7 @@
     (local $k i32)
     (local $j i32)
     (local $tmp i32)
+    (local $o i32)
     (i32.const 5)
     (i32.const 4)
     (call $allocate_array)
@@ -188,16 +189,16 @@
       )
     )
     (i32.const 1)
-    (local.set $k)
+    (local.set $o)
     ;; For loop range
     (block $break
       (loop $continue
-        (local.get $k)
+        (local.get $o)
         (i32.const 5)
         (i32.gt_s)
         (br_if $break)
         (local.get $arr)
-        (local.get $k)
+        (local.get $o)
         (i32.const 1)
         (i32.sub)
         (i32.const 4)
@@ -207,10 +208,10 @@
         (call $print_int)
         (i32.const 10)
         (call $print_char)
-        (local.get $k)
+        (local.get $o)
         (i32.const 1)
         (i32.add)
-        (local.set $k)
+        (local.set $o)
         (br $continue)
       )
     )
@@ -223,8 +224,45 @@
     (call $write_string)
   )
   (func $print_real (param $val f64)
-    (i32.trunc_f64_s (local.get $val))
-    (call $print_int)
+    (local $int i32)
+    (local $frac i32)
+    (local.set $int (i32.trunc_f64_s (local.get $val)))
+    (local.set $frac
+      (i32.trunc_f64_s
+        (f64.add
+          (f64.mul
+            (f64.sub (local.get $val) (f64.convert_i32_s (local.get $int)))
+            (f64.const 10.0)
+          )
+          (f64.const 0.5)
+        )
+      )
+    )
+    (if (i32.lt_s (local.get $frac) (i32.const 0))
+      (then
+        (local.set $frac (i32.sub (i32.const 0) (local.get $frac)))
+      )
+    )
+    (if (i32.ge_s (local.get $frac) (i32.const 10))
+      (then
+        (local.set $frac (i32.sub (local.get $frac) (i32.const 10)))
+        (local.set $int (i32.add (local.get $int) (i32.const 1)))
+      )
+    )
+    (if (i32.eq (local.get $frac) (i32.const 0))
+      (then
+        (local.get $int)
+        (call $print_int)
+      )
+      (else
+        (local.get $int)
+        (call $print_int)
+        (i32.const 46)
+        (call $print_char)
+        (local.get $frac)
+        (call $print_int)
+      )
+    )
   )
   (func $print_bool (param $val i32)
     (if (local.get $val) (then (call $print_int (i32.const 1))) (else (call $print_int (i32.const 0))))

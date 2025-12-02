@@ -4,7 +4,7 @@
   (memory (export "memory") 1)
   (data (i32.const 1024) "\00\00\00\00\00\00\00\00")
   (data (i32.const 2048) "\00\00\00\00\00\00\00\00")
-  (global $heap_ptr (mut i32) (i32.const 0))
+  (global $heap_ptr (mut i32) (i32.const 4096))
   ;; Main entry point
   (func $_start
     ;; Local variables
@@ -13,6 +13,7 @@
     (local $k i32)
     (local $j i32)
     (local $tmp i32)
+    (local $o i32)
     (i32.const 5)
     (i32.const 4)
     (call $allocate_array)
@@ -188,16 +189,16 @@
       )
     )
     (i32.const 1)
-    (local.set $k)
+    (local.set $o)
     ;; For loop range
     (block $break
       (loop $continue
-        (local.get $k)
+        (local.get $o)
         (i32.const 5)
         (i32.gt_s)
         (br_if $break)
         (local.get $arr)
-        (local.get $k)
+        (local.get $o)
         (i32.const 1)
         (i32.sub)
         (i32.const 4)
@@ -207,10 +208,10 @@
         (call $print_int)
         (i32.const 10)
         (call $print_char)
-        (local.get $k)
+        (local.get $o)
         (i32.const 1)
         (i32.add)
-        (local.set $k)
+        (local.set $o)
         (br $continue)
       )
     )
