@@ -16,15 +16,8 @@ public class CodeGenerator implements ASTVisitor {
     private final FunctionEnvironment functionEnvironment;
     private final Map<String, RecordTypeNode> recordVarTypes;
     private final Map<String, ASTNode> variableTypeAsts;
-    // Track top-level (program-scope) variables and their wasm storage types
-    // so that functions can declare matching locals and refer to them without
-    // producing invalid WAT.
     private final Map<String, String> globalVarWasmTypes;
-    // Track top-level variable declarations themselves so that we can
-    // re-use their initializers when initializing corresponding locals
-    // inside functions.
     private final Map<String, VariableDeclarationNode> globalVarDecls;
-    private String currentFunction;
     private final List<String> functions;
     private final StringBuilder functionDefs;
     private String lastVariable;
@@ -45,48 +38,35 @@ public class CodeGenerator implements ASTVisitor {
     }
 
     public void generate(ProgramNode program) throws IOException {
-        // Start module
         writer.writeLine("(module");
         writer.indent();
 
-        // Runtime functions with imports (MUST be first)
         writeRuntimeFunctions();
 
-        // Memory section (exported as "memory" for WASI)
         writer.writeLine("(memory (export \"memory\") 1)");
 
-        // Data section for string output buffer
-        writer.writeLine("(data (i32.const 1024) \"\\00\\00\\00\\00\\00\\00\\00\\00\")"); // Space for output buffer
-        writer.writeLine("(data (i32.const 2048) \"\\00\\00\\00\\00\\00\\00\\00\\00\")"); // Space for iovs
+        writer.writeLine("(data (i32.const 1024) \"\\00\\00\\00\\00\\00\\00\\00\\00\")");
+        writer.writeLine("(data (i32.const 2048) \"\\00\\00\\00\\00\\00\\00\\00\\00\")");
 
-        // Globals
         writer.writeLine("(global $heap_ptr (mut i32) (i32.const 0))");
 
-        // Generate the program (includes user-defined functions and main)
         program.accept(this);
 
-        // Export the WASI entry point so that the runtime invokes our main wrapper
         writer.writeLine("(export \"_start\" (func $_start))");
 
-        // Add remaining runtime functions after user code
         writeRemainingRuntimeFunctions();
 
-        // Close module
         writer.dedent();
         writer.writeLine(")");
         writer.flush();
     }
 
     private void writeRuntimeFunctions() throws IOException {
-        // Import WASI functions (must be first in module)
         writer.writeLine("(import \"wasi_snapshot_preview1\" \"fd_write\" (func $fd_write (param i32 i32 i32 i32) (result i32)))");
         writer.writeLine("(import \"wasi_snapshot_preview1\" \"proc_exit\" (func $proc_exit (param i32)))");
-
-        // All other functions will be added later
     }
 
     private void writeRemainingRuntimeFunctions() throws IOException {
-        // print_int function - convert integer to string and write it using WASI
         writer.writeLine("(func $print_int (param $val i32)");
         writer.indent();
         writer.writeLine("(call $int_to_string (local.get $val))");
@@ -94,17 +74,13 @@ public class CodeGenerator implements ASTVisitor {
         writer.dedent();
         writer.writeLine(")");
 
-        // print_real function - print with at most one decimal place.
-        // If the fractional digit is zero, print only the integer part (no ".0").
         writer.writeLine("(func $print_real (param $val f64)");
         writer.indent();
         writer.writeLine("(local $int i32)");
         writer.writeLine("(local $frac i32)");
 
-        // Integer part: trunc toward zero
         writer.writeLine("(local.set $int (i32.trunc_f64_s (local.get $val)))");
 
-        // Fractional part: round((val - int) * 10.0) to nearest integer
         writer.writeLine("(local.set $frac");
         writer.indent();
         writer.writeLine("(i32.trunc_f64_s");
@@ -125,7 +101,6 @@ public class CodeGenerator implements ASTVisitor {
         writer.dedent();
         writer.writeLine(")"); // close local.set $frac
 
-        // Make sure fractional digit is non-negative
         writer.writeLine("(if (i32.lt_s (local.get $frac) (i32.const 0))");
         writer.indent();
         writer.writeLine("(then");
@@ -136,7 +111,6 @@ public class CodeGenerator implements ASTVisitor {
         writer.dedent();
         writer.writeLine(")");
 
-        // Handle carry when rounded fractional digit becomes 10
         writer.writeLine("(if (i32.ge_s (local.get $frac) (i32.const 10))");
         writer.indent();
         writer.writeLine("(then");
@@ -148,7 +122,6 @@ public class CodeGenerator implements ASTVisitor {
         writer.dedent();
         writer.writeLine(")");
 
-        // If fractional digit is zero, print only the integer part
         writer.writeLine("(if (i32.eq (local.get $frac) (i32.const 0))");
         writer.indent();
         writer.writeLine("(then");
@@ -160,7 +133,6 @@ public class CodeGenerator implements ASTVisitor {
         writer.writeLine("(else");
         writer.indent();
 
-        // Otherwise print integer part, decimal point and one fractional digit
         writer.writeLine("(local.get $int)");
         writer.writeLine("(call $print_int)");
         writer.writeLine("(i32.const 46)"); // '.'
@@ -173,18 +145,15 @@ public class CodeGenerator implements ASTVisitor {
         writer.dedent();
         writer.writeLine(")");
 
-        // Close print_real function
         writer.dedent();
         writer.writeLine(")");
 
-        // print_bool function
         writer.writeLine("(func $print_bool (param $val i32)");
         writer.indent();
         writer.writeLine("(if (local.get $val) (then (call $print_int (i32.const 1))) (else (call $print_int (i32.const 0))))");
         writer.dedent();
         writer.writeLine(")");
 
-        // int_to_string function - convert int to string in memory
         writer.writeLine("(func $int_to_string (param $num i32)");
         writer.indent();
         writer.writeLine("(local $ptr i32)");
@@ -216,12 +185,10 @@ public class CodeGenerator implements ASTVisitor {
         writer.dedent();
         writer.writeLine(")");
         writer.writeLine("(call $reverse_string (i32.const 1024) (local.get $digits))");
-        // Null-terminate the string so that string_length stops after the current number
         writer.writeLine("(i32.store8 (i32.add (i32.const 1024) (local.get $digits)) (i32.const 0))");
         writer.dedent();
         writer.writeLine(")");
 
-        // reverse_string function
         writer.writeLine("(func $reverse_string (param $ptr i32) (param $len i32)");
         writer.indent();
         writer.writeLine("(local $i i32)");
@@ -247,38 +214,34 @@ public class CodeGenerator implements ASTVisitor {
         writer.dedent();
         writer.writeLine(")");
 
-        // write_string function
         writer.writeLine("(func $write_string");
         writer.indent();
         writer.writeLine("(local $iovs_ptr i32)");
         writer.writeLine("(local $str_len i32)");
-        writer.writeLine("(local.set $iovs_ptr (i32.const 2048))"); // iovs array
+        writer.writeLine("(local.set $iovs_ptr (i32.const 2048))");
         writer.writeLine("(local.set $str_len (call $string_length (i32.const 1024)))");
-        writer.writeLine("(i32.store (local.get $iovs_ptr) (i32.const 1024))"); // ptr to string
-        writer.writeLine("(i32.store (i32.add (local.get $iovs_ptr) (i32.const 4)) (local.get $str_len))"); // length
+        writer.writeLine("(i32.store (local.get $iovs_ptr) (i32.const 1024))");
+        writer.writeLine("(i32.store (i32.add (local.get $iovs_ptr) (i32.const 4)) (local.get $str_len))");
         writer.writeLine("(call $fd_write");
         writer.indent();
-        writer.writeLine("(i32.const 1)"); // stdout
+        writer.writeLine("(i32.const 1)");
         writer.writeLine("(local.get $iovs_ptr)");
-        writer.writeLine("(i32.const 1)"); // number of iovs
-        writer.writeLine("(i32.const 0)"); // nwritten ptr
+        writer.writeLine("(i32.const 1)");
+        writer.writeLine("(i32.const 0)");
         writer.dedent();
         writer.writeLine(")");
-        writer.writeLine("(drop)"); // ignore result
+        writer.writeLine("(drop)");
         writer.dedent();
         writer.writeLine(")");
 
-        // print_char function - print a single ASCII character
         writer.writeLine("(func $print_char (param $ch i32)");
         writer.indent();
-        // Store character and null-terminate buffer at 1024, then reuse write_string
         writer.writeLine("(i32.store8 (i32.const 1024) (local.get $ch))");
         writer.writeLine("(i32.store8 (i32.add (i32.const 1024) (i32.const 1)) (i32.const 0))");
         writer.writeLine("(call $write_string)");
         writer.dedent();
         writer.writeLine(")");
 
-        // string_length function
         writer.writeLine("(func $string_length (param $ptr i32) (result i32)");
         writer.indent();
         writer.writeLine("(local $len i32)");
@@ -298,43 +261,29 @@ public class CodeGenerator implements ASTVisitor {
         writer.dedent();
         writer.writeLine(")");
 
-        // allocate_array function - allocate memory for array
-        // param $size: number of elements
-        // param $element_size: size of each element in bytes
-        // result: pointer to allocated array
         writer.writeLine("(func $allocate_array (param $size i32) (param $element_size i32) (result i32)");
         writer.indent();
         writer.writeLine("(local $total_bytes i32)");
         writer.writeLine("(local $array_ptr i32)");
 
-        // Calculate total bytes needed: size * element_size
         writer.writeLine("(local.set $total_bytes (i32.mul (local.get $size) (local.get $element_size)))");
 
-        // Get current heap pointer
         writer.writeLine("(local.set $array_ptr (global.get $heap_ptr))");
 
-        // Update heap pointer
         writer.writeLine("(global.set $heap_ptr (i32.add (global.get $heap_ptr) (local.get $total_bytes)))");
 
-        // Return array pointer
         writer.writeLine("(local.get $array_ptr)");
         writer.dedent();
         writer.writeLine(")");
 
-        // allocate_record function - allocate memory for record
-        // param $size: size of record in bytes
-        // result: pointer to allocated record
         writer.writeLine("(func $allocate_record (param $size i32) (result i32)");
         writer.indent();
         writer.writeLine("(local $record_ptr i32)");
 
-        // Get current heap pointer
         writer.writeLine("(local.set $record_ptr (global.get $heap_ptr))");
 
-        // Update heap pointer
         writer.writeLine("(global.set $heap_ptr (i32.add (global.get $heap_ptr) (local.get $size)))");
 
-        // Return record pointer
         writer.writeLine("(local.get $record_ptr)");
         writer.dedent();
         writer.writeLine(")");
@@ -383,7 +332,6 @@ public class CodeGenerator implements ASTVisitor {
 
         // Then generate main function with variable declarations and statements
         try {
-            currentFunction = "main";
             scopeManager.resetForNewFunction();
             recordVarTypes.clear();
             variableTypeAsts.clear();
@@ -688,7 +636,7 @@ public class CodeGenerator implements ASTVisitor {
         }
 
         try {
-            currentFunction = node.getName();
+            node.getName();
             scopeManager.resetForNewFunction();
             recordVarTypes.clear();
             variableTypeAsts.clear();
