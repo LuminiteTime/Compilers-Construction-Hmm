@@ -755,8 +755,29 @@ public class CodeGenerator implements ASTVisitor {
                 // starting values as at the top level. To avoid recursive code
                 // generation and potential stack overflows, we handle only
                 // LiteralNode initializers here and emit constants directly.
+                //
+                // IMPORTANT: skip any global whose name is shadowed by a routine
+                // parameter. In that case, the parameter's local is the one
+                // associated with the name (localIndex < paramCount), and we must
+                // not overwrite it with the global's initializer value.
                 for (Map.Entry<String, VariableDeclarationNode> entry : globalVarDecls.entrySet()) {
+                    String globalName = entry.getKey();
                     VariableDeclarationNode globalDecl = entry.getValue();
+
+                    // Only initialize if this function actually has a non-parameter
+                    // local representing the top-level variable.
+                    VariableScopeManager.VariableInfo varInfo = scopeManager.lookupVariable(globalName);
+                    if (varInfo == null) {
+                        continue; // no local with this name in this function
+                    }
+                    if (varInfo.localIndex < node.getParameters().size()) {
+                        // This name refers to a parameter (e.g. 'a' in
+                        // init_array_1_to_5(a : IntArray5)), not a global copy.
+                        // Do not overwrite the parameter with the global's
+                        // initializer value.
+                        continue;
+                    }
+
                     if (!(globalDecl.getInitializer() instanceof LiteralNode)) {
                         continue;
                     }
@@ -775,7 +796,7 @@ public class CodeGenerator implements ASTVisitor {
                         continue;
                     }
 
-                    writer.writeLine("(local.set $" + globalDecl.getName() + ")");
+                    writer.writeLine("(local.set $" + globalName + ")");
                 }
 
                 // Generate function body
