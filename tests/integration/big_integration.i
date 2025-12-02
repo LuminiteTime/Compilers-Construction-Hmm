@@ -1,5 +1,3 @@
-// Big integration test: complex program using most language features
-
 type Address is record
   var street : integer is 0
   var house  : integer is 0

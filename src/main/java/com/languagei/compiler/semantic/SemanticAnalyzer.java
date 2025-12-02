@@ -95,14 +95,27 @@ public class SemanticAnalyzer implements ASTVisitor {
 
     @Override
     public void visit(ProgramNode node) {
-        // Analyze declarations (already collected in first pass)
-        for (ASTNode decl : node.getDeclarations()) {
-            decl.accept(this);
-        }
+        // Analyze all top-level items in source order so that
+        // uses of variables before their declarations are reported
+        // as errors. Declarations and statements are stored
+        // separately in ProgramNode, so we reconstruct the
+        // original order using source positions.
+        List<ASTNode> items = new ArrayList<>();
+        items.addAll(node.getDeclarations());
+        items.addAll(node.getStatements());
 
-        // Analyze statements
-        for (ASTNode stmt : node.getStatements()) {
-            stmt.accept(this);
+        items.sort((a, b) -> {
+            com.languagei.compiler.lexer.Position pa = a.getPosition();
+            com.languagei.compiler.lexer.Position pb = b.getPosition();
+            int lineCmp = Integer.compare(pa.getLine(), pb.getLine());
+            if (lineCmp != 0) return lineCmp;
+            int colCmp = Integer.compare(pa.getColumn(), pb.getColumn());
+            if (colCmp != 0) return colCmp;
+            return Integer.compare(pa.getOffset(), pb.getOffset());
+        });
+
+        for (ASTNode item : items) {
+            item.accept(this);
         }
     }
 
