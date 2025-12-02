@@ -36,7 +36,7 @@ Supported commands:
 - `run` – compile to WAT and immediately run via `wasmtime`.
 
   ```bash
-  java -jar target/compiler-i-1.0.0.jar run tests/integration/array_sum.i
+java -jar target/compiler-i-1.0.0.jar run tests/integration/array_sum.i -o output/array_sum.wat
   ```
 
 - `ast` – parse and print the AST of a program.

@@ -18,6 +18,11 @@ var complex is (5 > 3) and (10 >= 8) or not (2 = 3)
 print eq
 print ne
 print lt
+print le
+print gt
+print ge
 print and_expr
 print or_expr
+print xor_expr
+print not_expr
 print complex

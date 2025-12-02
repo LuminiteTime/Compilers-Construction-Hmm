@@ -59,7 +59,7 @@ public class Main {
                     compiler = new Compiler();
                     String watFile = watFileArg;
                     compiler.compile(sourceFile, watFile);
-                    System.out.println("\u2713 Compiled to WAT");
+                    System.out.println("!!! Compiled to WAT");
 
                     // After successful compilation, execute the generated WAT via wasmtime
                     try {
@@ -111,7 +111,6 @@ public class Main {
             }
         } catch (Exception e) {
             System.err.println("✗ Error: " + e.getMessage());
-            e.printStackTrace();
             System.exit(1);
         }
     }
@@ -123,12 +122,12 @@ public class Main {
         System.out.println("  java -jar compiler-i.jar compile <source.i> [-o output.wat]");
         System.out.println("  java -jar compiler-i.jar run <source.i> [-o output.wat]");
         System.out.println("  java -jar compiler-i.jar ast <source.i>");
-        System.out.println("  java -jar compiler-i.jar tokens <source.i>");
+
         System.out.println();
         System.out.println("Commands:");
         System.out.println("  compile  Compile Language I source to WebAssembly Text format");
         System.out.println("  run      Compile and run a Language I program");
         System.out.println("  ast      Display the optimized Abstract Syntax Tree");
-        System.out.println("  tokens   Display the token stream produced by the lexer");
+
     }
 }

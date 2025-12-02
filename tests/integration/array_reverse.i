@@ -1,4 +1,4 @@
-// Integration test: reverse an array in place
+
 var arr : array [5] integer
 arr[1] := 1
 arr[2] := 2
