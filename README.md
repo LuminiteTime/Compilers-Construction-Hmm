@@ -1,54 +1,77 @@
 # Language I Compiler
 
-## Overview
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Java](https://img.shields.io/badge/Java-15%2B-orange)](https://openjdk.org/)
+[![Maven](https://img.shields.io/badge/build-Maven-C71A36)](https://maven.apache.org/)
 
-| Aspect                     | Value                                     |
-|----------------------------|-------------------------------------------|
-| Source language            | Language I                                |
-| Implementation language    | Java                                      |
-| Parser Technology          | JavaCC                                    |
-| Target platform            | WebAssembly                               |
+A compiler for **Language I**: lexing and parsing (JavaCC), semantic analysis, and code generation to **WebAssembly text format (WAT)**. The CLI can compile sources, dump an AST, or compile and execute via [wasmtime](https://wasmtime.dev/).
+
+## Prerequisites
+
+| Requirement | Purpose |
+|-------------|---------|
+| **JDK 15+** | Compile and run the project |
+| **Apache Maven 3.x** | Build, tests, JavaCC code generation |
+| **`wasmtime` on `PATH`** | `run` subcommand and WebAssembly integration tests |
 
 ## Build
+
+From the repository root:
 
 ```bash
 ./scripts/build.sh
 ```
 
-This produces a JAR at `target/compiler-i-1.0.0.jar`.
+This runs `mvn clean package -DskipTests` and produces:
+
+`target/compiler-i-1.0.0.jar`
+
+Alternatively:
+
+```bash
+mvn clean package
+```
 
 ## CLI usage
 
-General form:
-
-```bash
+```text
 java -jar target/compiler-i-1.0.0.jar <command> <source.i> [options]
 ```
 
-Supported commands:
+| Command | Description |
+|---------|-------------|
+| `compile` | Emit WAT for the source file (`-o` output path). |
+| `run` | Compile to WAT and execute with `wasmtime`. |
+| `ast` | Parse and print the abstract syntax tree. |
 
-- `compile` – compile a Language I source file to WebAssembly text (WAT).
+Examples:
 
-  ```bash
-  java -jar target/compiler-i-1.0.0.jar compile tests/integration/array_sum.i -o output/array_sum.wat
-  ```
-
-- `run` – compile to WAT and immediately run via `wasmtime`.
-
-  ```bash
+```bash
+java -jar target/compiler-i-1.0.0.jar compile tests/integration/array_sum.i -o output/array_sum.wat
 java -jar target/compiler-i-1.0.0.jar run tests/integration/array_sum.i -o output/array_sum.wat
-  ```
+java -jar target/compiler-i-1.0.0.jar ast tests/integration/array_sum.i
+```
 
-- `ast` – parse and print the AST of a program.
+## Testing
 
-  ```bash
-  java -jar target/compiler-i-1.0.0.jar ast tests/integration/array_sum.i
-  ```
+**Unit tests** (JUnit 5):
 
-## Integration tests
+```bash
+mvn test
+```
 
-WebAssembly integration tests (Language I programs compiled to WAT and run under `wasmtime`):
+**WebAssembly integration tests** (compile `.i` fixtures to WAT and run under `wasmtime`; requires a prior build):
 
 ```bash
 ./run_integration_wasm.sh
 ```
+
+## Project layout (overview)
+
+- **`grammar/`** — JavaCC grammar (`LanguageI.jj`)
+- **`src/main/java/`** — lexer, parser adapter, AST, semantic passes, codegen, CLI entrypoint
+- **`tests/integration/`** — Language I programs used by integration scripts
+
+## License
+
+This project is released under the [MIT License](LICENSE).
